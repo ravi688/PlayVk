@@ -11,10 +11,12 @@
 #-------------------------------------------
 #		Project Configuration
 #-------------------------------------------
-PROJECT_NAME = TemplateRepo
-STATIC_LIB_NAME = templaterepo.a
-DYNAMIC_LIB_NAME = templaterepo.dll
+PROJECT_NAME = PlayVk
+STATIC_LIB_NAME = playvk.a
+DYNAMIC_LIB_NAME = playvk.dll
 EXECUTABLE_NAME = main.exe
+EXTERNAL_INCLUDES = 
+EXTERNAL_LIBS = -L./external-dependency-libs -lglfw3 -lvulkan-1 -lgdi32
 DEPENDENCIES = #CallTrace
 DEPENDENCY_LIBS = #CallTrace/lib/calltrace.a
 DEPENDENCIES_DIR = ./dependencies
@@ -105,7 +107,7 @@ SHARED_DEPENDENCY_INCLUDES = $(addsuffix /include, $(__SHARED_DEPENDENCIES))
 INCLUDES= -I.\include $(EXTERNAL_INCLUDES) $(addprefix -I, $(DEPENDENCY_INCLUDES) $(SHARED_DEPENDENCY_INCLUDES))
 SOURCES= $(wildcard source/*.c)
 OBJECTS= $(addsuffix .o, $(basename $(SOURCES)))
-LIBS = 
+LIBS = $(EXTERNAL_LIBS)
 
 #Flags and Defines
 DEBUG_DEFINES =  -DGLOBAL_DEBUG -DDEBUG -DLOG_DEBUG
@@ -231,8 +233,14 @@ bin-clean:
 #-------------------------------------------
 #		Cleaning
 #-------------------------------------------
+
+.PHONY: clean-project-internal
+
+clean-project-internal:
+	$(MAKE) -f $(addsuffix .makefile, $(PROJECT_NAME)) clean
+
 .PHONY: clean
-clean: bin-clean 
+clean: bin-clean clean-project-internal
 	@echo [Log] All cleaned successfully!
 #-------------------------------------------
 
@@ -244,11 +252,22 @@ clean: bin-clean
 .PHONY: build-debug
 .PHONY: run
 
+.PHONY: build-project-internal-debug
+.PHONY: build-project-internal-release
+
+build-project-internal-debug:
+	$(MAKE) -f $(addsuffix .makefile, $(PROJECT_NAME)) debug
+
+build-project-internal-release:
+	$(MAKE) -f $(addsuffix .makefile, $(PROJECT_NAME)) release
+
 build-release:
+	$(MAKE) build-project-internal-release
 	$(MAKE) lib-static-release
 	$(MAKE) release
 
 build-debug:
+	$(MAKE) build-project-internal-debug
 	$(MAKE) lib-static-debug
 	$(MAKE) debug
 
