@@ -1,2 +1,3 @@
-# TemplateRepository
-This repository contains template for a project in C language
+# PlayVk
+
+PlayVk is a single header file library for simplifying vulkan objects creation, initializing vulkan, and rendering basic geometries.
