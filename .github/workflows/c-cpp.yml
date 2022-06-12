@@ -16,6 +16,8 @@ jobs:
     - uses: actions/checkout@v3
     - name: shader compiler test
       run: glslc --version
+    - name: build system test
+      run: mingw32-make --version
     - name: build-debug
       run: mingw32-make -s build-debug
     - name: cleaning
