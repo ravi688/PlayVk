@@ -454,8 +454,8 @@ int main()
 	VkClearValue* clearValues = newv(VkClearValue, 3);
 	for(int i = 0; i < 2; i++)
 	{
-		clearValues[i].color.float32[0] = 0;
-		clearValues[i].color.float32[1] = 0;
+		clearValues[i].color.float32[0] = 0.1f;
+		clearValues[i].color.float32[1] = 0.3f;
 		clearValues[i].color.float32[2] = 0;
 		clearValues[i].color.float32[3] = 1;
 	}
