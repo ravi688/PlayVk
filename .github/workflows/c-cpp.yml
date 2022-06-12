@@ -17,3 +17,5 @@ jobs:
       run: glslc --version
     - name: build-debug
       run: mingw32-make -s build-debug
+    - name: cleaning
+      run: mingw32-make -i -s clean
