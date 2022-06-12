@@ -13,5 +13,7 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
+    - name: install-vulkan-sdk
+      run: choco install vulkan-sdk
     - name: build-debug
       run: mingw32-make -s build-debug
