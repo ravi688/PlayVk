@@ -16,7 +16,7 @@ jobs:
     - name: install-vulkan-sdk
       run: choco install vulkan-sdk
     - name: environment variable setup
-      run: set PATH="%PATH%C:\VulkanSDK\1.2.198.1\Bin;"
+      run: set PATH="%PATH%C:\VulkanSDK\1.2.182.0\Bin;"
     - name: shader compiler test
       run: glslc --version
     - name: build-debug
