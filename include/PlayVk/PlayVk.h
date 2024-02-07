@@ -26,7 +26,6 @@ static const double PVK_INVERSE_PI = 0.3183098;
 static const double PVK_INVERSE_180 = 0.0055555;
 static const double PVK_RAD2DEG = PVK_INVERSE_PI * 180.0;
 static const double PVK_DEG2RAD = PVK_INVERSE_180 * PVK_PI;
-#define DEG * PVK_DEG2RAD
 #define RAD
 
 static void __pvkScaleFloats(uint32_t count, float* const values, const float scalar)

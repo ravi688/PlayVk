@@ -21,8 +21,8 @@ EXTERNAL_INCLUDES =
 EXTERNAL_LIBS =-L./external-dependency-libs -lglfw3 -lvulkan-1 -lgdi32
 BUILD_DEFINES=
 
-DEPENDENCIES = #Common
-DEPENDENCY_LIBS = #Common/lib/common.a
+DEPENDENCIES = Common Common/dependencies/BufferLib Common/dependencies/BufferLib/dependencies/CallTrace
+DEPENDENCY_LIBS = Common/lib/common.a Common/dependencies/BufferLib/lib/bufferlib.a Common/dependencies/BufferLib/dependencies/CallTrace/lib/calltrace.a
 DEPENDENCIES_DIR = ./dependencies
 SHARED_DEPENDENCIES =
 SHARED_DEPENDENCY_LIBS =
@@ -292,7 +292,7 @@ bin-clean:
 	$(RM) $(TARGET_DYNAMIC_IMPORT_LIB)
 	$(RM_DIR) $(TARGET_LIB_DIR)
 	@echo [Log] Binaries cleaned successfully!
-# 	$(MAKE) --directory=./dependencies/Common clean
+	$(MAKE) --directory=./dependencies/Common clean
 # 	$(MAKE) --directory=./shared-dependencies/CallTrace clean
 # 	$(MAKE) --directory=./dependencies/HPML clean
 # 	$(MAKE) --directory=../../shared-dependencies/HPML clean
