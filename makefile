@@ -17,8 +17,8 @@ DYNAMIC_LIB_NAME = playvk.dll
 EXECUTABLE_NAME = main
 MAIN_SOURCE_LANG = c
 MAIN_SOURCES=main.c
-EXTERNAL_INCLUDES =
-EXTERNAL_LIBS =-L./external-dependency-libs -lglfw3 -lvulkan-1 -lgdi32
+EXTERNAL_INCLUDES = -I"$(VK_SDK_PATH)/Include/"
+EXTERNAL_LIBS =-L./external-dependency-libs -lglfw3 -L"$(VK_SDK_PATH)/Lib/" -lvulkan-1 -lgdi32
 BUILD_DEFINES=
 
 DEPENDENCIES = Common Common/dependencies/BufferLib Common/dependencies/BufferLib/dependencies/CallTrace
