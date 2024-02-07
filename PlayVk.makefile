@@ -1,11 +1,13 @@
 
+GLSLC:=glslangValidator
+GLSLC_FLAGS:= -V
 SHADERS = $(wildcard shaders/*.frag shaders/*.vert)
 SPIRV_SHADERS = $(addsuffix .spv, $(SHADERS))
 
 %.frag.spv: %.frag
-	glslc $^ -o $@
+	$(GLSLC) $(GLSLC_FLAGS) $^ -o $@
 %.vert.spv: %.vert
-	glslc $^ -o $@
+	$(GLSLC) $(GLSLC_FLAGS) $^ -o $@
 
 .PHONY: shader
 shader: $(SPIRV_SHADERS)
@@ -26,5 +28,5 @@ release: MESSAGE shader
 	@echo [Log] PlayVk Shaders have been built successfully
 
 clean:
-	del $(subst /,\, $(SPIRV_SHADERS))
+	$(RM) $(subst /,\, $(SPIRV_SHADERS))
 	@echo [Log] PlayVk Shader have been cleaned successfully
