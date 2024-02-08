@@ -26,6 +26,9 @@ static const double PVK_INVERSE_PI = 0.3183098;
 static const double PVK_INVERSE_180 = 0.0055555;
 static const double PVK_RAD2DEG = PVK_INVERSE_PI * 180.0;
 static const double PVK_DEG2RAD = PVK_INVERSE_180 * PVK_PI;
+#ifndef DEG
+#	define DEG * PVK_DEG2RAD
+#endif
 #define RAD
 
 static void __pvkScaleFloats(uint32_t count, float* const values, const float scalar)
@@ -345,6 +348,13 @@ static void glfwErrorCallback(int code, const char* description)
 }
 #endif
 
+static void windowResizeCallbackHandler(GLFWwindow* window, int width, int height)
+{
+	PvkWindow* pvkWindow = (PvkWindow*)glfwGetWindowUserPointer(window);
+	pvkWindow->width = width;
+	pvkWindow->height = height;
+}
+
 static PvkWindow* pvkWindowCreate(uint32_t width, uint32_t height, const char* title, bool full_screen, bool resizable)
 {
 	PvkWindow* window = new(PvkWindow);
@@ -355,10 +365,10 @@ static PvkWindow* pvkWindowCreate(uint32_t width, uint32_t height, const char* t
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 	glfwWindowHint(GLFW_RESIZABLE, resizable ? GLFW_TRUE : GLFW_FALSE);
 	window->handle = glfwCreateWindow(width, height, title, full_screen ? glfwGetPrimaryMonitor() : NULL, NULL);
-	// glfwSetFramebufferSizeCallback(window->handle, glfwOnWindowResizeCallback);
-	glfwSetWindowUserPointer(window->handle, window);
 	window->width = width;
 	window->height = height;
+	glfwSetWindowUserPointer((GLFWwindow*)(window->handle), (void*)window);
+	glfwSetFramebufferSizeCallback((GLFWwindow*)(window->handle), windowResizeCallbackHandler);
 	return window;
 }
 
@@ -777,7 +787,7 @@ static VkDevice pvkCreateLogicalDeviceWithExtensions(VkInstance instance, VkPhys
 static VkSwapchainKHR pvkCreateSwapchain(VkDevice device, VkSurfaceKHR surface, 
 											uint32_t width, uint32_t height, 
 											VkFormat format, VkColorSpaceKHR colorSpace, VkPresentModeKHR presentMode,
-											uint32_t queueFamilyCount, uint32_t* queueFamilyIndices)
+											uint32_t queueFamilyCount, uint32_t* queueFamilyIndices, VkSwapchainKHR oldSwapchain)
 {
 	// union operation
 	uint32_t uniqueQueueFamilyCount;
@@ -801,7 +811,7 @@ static VkSwapchainKHR pvkCreateSwapchain(VkDevice device, VkSurfaceKHR surface,
 		.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
 		.presentMode = presentMode,
 		.clipped = VK_TRUE,
-		.oldSwapchain = VK_NULL_HANDLE
+		.oldSwapchain = oldSwapchain
 	};
 
 	VkSwapchainKHR swapchain;
@@ -868,7 +878,7 @@ static void pvkSubmit(VkCommandBuffer commandBuffer, VkQueue queue, VkSemaphore 
 	PVK_CHECK(vkQueueSubmit(queue, 1, &info, VK_NULL_HANDLE));
 }
 
-static void pvkPresent(uint32_t index, VkSwapchainKHR  swapchain, VkQueue queue, VkSemaphore wait)
+static bool pvkPresent(uint32_t index, VkSwapchainKHR  swapchain, VkQueue queue, VkSemaphore wait)
 {
 	VkResult result;
 	VkPresentInfoKHR info = 
@@ -882,11 +892,17 @@ static void pvkPresent(uint32_t index, VkSwapchainKHR  swapchain, VkQueue queue,
 		.pResults = &result
 	};
 	// assert(result == VK_SUCCESS);
-	PVK_CHECK(vkQueuePresentKHR(queue, &info));
+	result = vkQueuePresentKHR(queue, &info);
+	if((result == VK_ERROR_OUT_OF_DATE_KHR) || (result == VK_SUBOPTIMAL_KHR))
+		return false;
+	else
+		PVK_CHECK(result);
+	return true;
 }
 
 static void pvkBeginCommandBuffer(VkCommandBuffer commandBuffer)
 {
+	PVK_CHECK(vkResetCommandBuffer(commandBuffer, 0));
 	VkCommandBufferBeginInfo beginInfo = { .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
 	PVK_CHECK(vkBeginCommandBuffer(commandBuffer, &beginInfo));
 }
@@ -1353,33 +1369,28 @@ static VkPipeline pvkCreateShadowMapGraphicsPipeline(VkDevice device, VkPipeline
 	return pipeline;
 }
 
-static VkPipeline pvkCreateGraphicsPipeline(VkDevice device, VkPipelineLayout layout, VkRenderPass renderPass, uint32_t subpassIndex, uint32_t width, uint32_t height, uint32_t count, ...)
+static VkPipeline pvkCreateGraphicsPipeline(VkDevice device, VkPipelineLayout layout, VkRenderPass renderPass, uint32_t subpassIndex, uint32_t colorAttachmentCount, uint32_t width, uint32_t height, uint32_t count, ...)
 {
 	va_list shaderModuleList;
 	va_start(shaderModuleList, count);
 
 	/* Color attachment configuration */
-	VkPipelineColorBlendAttachmentState colorAttachment = 
+	VkPipelineColorBlendAttachmentState* colorAttachments = newv(VkPipelineColorBlendAttachmentState, colorAttachmentCount);
+	for(uint32_t i = 0; i < colorAttachmentCount; i++)
 	{
-		.blendEnable = VK_FALSE,
-		.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT	
-	};
-
-	VkPipelineColorBlendAttachmentState colorAttachment2 = 
-	{
-		.blendEnable = VK_FALSE,
-		.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT
-	};
-
-	VkPipelineColorBlendAttachmentState* colorAttachments = newv(VkPipelineColorBlendAttachmentState, 2);
-	colorAttachments[0] = colorAttachment;
-	colorAttachments[1] = colorAttachment2;
+		VkPipelineColorBlendAttachmentState colorAttachment = 
+		{
+			.blendEnable = VK_FALSE,
+			.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT	
+		};
+		colorAttachments[i] = colorAttachment;
+	}
 
 	VkPipelineColorBlendStateCreateInfo colorBlend = 
 	{
 		.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
 		.logicOpEnable = VK_FALSE,
-		.attachmentCount = 2,
+		.attachmentCount = colorAttachmentCount,
 		.pAttachments = colorAttachments
 	};
 
@@ -1475,6 +1486,33 @@ static VkDescriptorSet* pvkAllocateDescriptorSets(VkDevice device, VkDescriptorP
 	return sets;
 }
 
+static VkDescriptorPool pvkCreateDescriptorPool(VkDevice device, u32 maxSets, u32 poolSize, ...)
+{
+	va_list args;
+	va_start(args, poolSize);
+	VkDescriptorPoolSize poolSizes[poolSize] = { };
+	for(u32 i = 0; i < poolSize; i++)
+	{
+		poolSizes[i] = (VkDescriptorPoolSize)
+		{
+			va_arg(args, VkDescriptorType),
+			va_arg(args, u32)
+		};
+	};
+	va_end(args);
+	VkDescriptorPoolCreateInfo cInfo = 
+	{
+		.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+		.maxSets = maxSets,
+		.poolSizeCount = poolSize,
+		.pPoolSizes = poolSizes
+	};
+
+	VkDescriptorPool pool;
+	PVK_CHECK(vkCreateDescriptorPool(device, &cInfo, NULL, &pool));
+	return pool;
+}
+
 static void pvkWriteImageViewToDescriptor(VkDevice device, VkDescriptorSet set, uint32_t binding, VkImageView imageView, VkSampler sampler, VkImageLayout layout, VkDescriptorType descriptorType)
 {
 	VkDescriptorImageInfo imageInfo = 
@@ -1555,7 +1593,7 @@ static PvkGeometry* __pvkCreateGeometry(VkPhysicalDevice physicalDevice, VkDevic
 	PvkGeometry* geometry = new(PvkGeometry);
 	geometry->vertexBuffer = vertexBuffer;
 	geometry->indexBuffer = indexBuffer;
-	geometry->indexCount = 36;
+	geometry->indexCount = data->indexCount;
 	geometry->transform = pvkMat4Identity();
 	return geometry;
 }

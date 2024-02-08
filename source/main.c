@@ -205,27 +205,6 @@ static VkRenderPass pvkCreateRenderPass2(VkDevice device)
 	return renderPass;
 }
 
-static VkDescriptorPool pvkCreateDescriptorPool(VkDevice device)
-{
-	VkDescriptorPoolSize poolSizes[3] =
-	{ 
-		{ VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1 },
-		{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 2 },
-		{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1 }
-	};
-	VkDescriptorPoolCreateInfo cInfo = 
-	{
-		.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
-		.maxSets = 4,
-		.poolSizeCount = 3,
-		.pPoolSizes = poolSizes
-	};
-
-	VkDescriptorPool pool;
-	PVK_CHECK(vkCreateDescriptorPool(device, &cInfo, NULL, &pool));
-	return pool;
-}
-
 static VkDescriptorSetLayout pvkCreateShadowMapDescriptorSetLayout(VkDevice device)
 {
 	VkDescriptorSetLayoutBinding binding = 
@@ -316,6 +295,58 @@ static VkDescriptorSetLayout pvkCreateObjectSetLayout(VkDevice device)
 	return setLayout;
 }
 
+static void recordCommandBuffers(u32 width, u32 height, VkCommandBuffer* commandBuffers,
+							    VkClearValue* clearValues,
+								VkRenderPass renderPass, 
+								VkRenderPass shadowMapRenderPass, 
+								VkFramebuffer* shadowMapFramebuffer,
+								VkFramebuffer* framebuffers,
+								VkPipeline shadowMapPipeline,
+								VkPipeline pipeline,
+								VkPipeline pipeline2,
+								VkPipelineLayout shadowMapPipelineLayout,
+								VkPipelineLayout pipelineLayout,
+								VkPipelineLayout pipelineLayout2,
+								VkDescriptorSet* set,
+								PvkGeometry* planeGeometry,
+								PvkGeometry* boxGeometry)
+{
+	for(int index = 0; index < 3; index++)
+	{
+		pvkBeginCommandBuffer(commandBuffers[index]);
+
+		/* shadow map renderpass */
+		VkClearValue shadowMapClearValue = { .depthStencil = { .depth = 1.0f, .stencil = 0.0f } };
+		pvkBeginRenderPass(commandBuffers[index], shadowMapRenderPass, *shadowMapFramebuffer, width, height, 1, &shadowMapClearValue);
+		vkCmdBindPipeline(commandBuffers[index], VK_PIPELINE_BIND_POINT_GRAPHICS, shadowMapPipeline);
+		vkCmdBindDescriptorSets(commandBuffers[index], VK_PIPELINE_BIND_POINT_GRAPHICS, shadowMapPipelineLayout, 0, 2, &set[1], 0, NULL);
+		pvkDrawGeometry(commandBuffers[index], planeGeometry);
+		pvkDrawGeometry(commandBuffers[index], boxGeometry);
+		pvkEndRenderPass(commandBuffers[index]);
+
+		/* color renderpass */
+		pvkBeginRenderPass(commandBuffers[index], renderPass, framebuffers[index], width, height, 3, clearValues);
+
+		/* first subpass */
+		vkCmdBindPipeline(commandBuffers[index], VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+		vkCmdBindDescriptorSets(commandBuffers[index], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 3, &set[1], 0, NULL);
+		pvkDrawGeometry(commandBuffers[index], planeGeometry);
+		pvkDrawGeometry(commandBuffers[index], boxGeometry);
+
+		vkCmdNextSubpass(commandBuffers[index], VK_SUBPASS_CONTENTS_INLINE);
+
+		/* second subpass */
+		vkCmdBindPipeline(commandBuffers[index], VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline2);
+		vkCmdBindDescriptorSets(commandBuffers[index], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout2, 0, 3, &set[0], 0, NULL);
+		pvkDrawGeometry(commandBuffers[index], planeGeometry);
+		pvkDrawGeometry(commandBuffers[index], boxGeometry);
+
+		pvkEndRenderPass(commandBuffers[index]);
+
+		pvkEndCommandBuffer(commandBuffers[index]);
+	}
+}
+
 int main()
 {
 	VkInstance instance = pvkCreateVulkanInstanceWithExtensions(2, "VK_KHR_win32_surface", "VK_KHR_surface");
@@ -342,9 +373,9 @@ int main()
 													VK_FORMAT_B8G8R8A8_SRGB, 
 													VK_COLOR_SPACE_SRGB_NONLINEAR_KHR, 
 													VK_PRESENT_MODE_FIFO_KHR,
-													2, queueFamilyIndices);
+													2, queueFamilyIndices, VK_NULL_HANDLE);
 
-	VkCommandPool commandPool = pvkCreateCommandPool(logicalGPU, 0, graphicsQueueFamilyIndex);
+	VkCommandPool commandPool = pvkCreateCommandPool(logicalGPU, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT, graphicsQueueFamilyIndex);
 	VkCommandBuffer* commandBuffers = pvkAllocateCommandBuffers(logicalGPU, commandPool, VK_COMMAND_BUFFER_LEVEL_PRIMARY);
 
 	VkSemaphore imageAvailableSemaphore = pvkCreateSemaphore(logicalGPU);
@@ -395,7 +426,9 @@ int main()
 													2, queueFamilyIndices);
 
 	/* Resource Descriptors */
-	VkDescriptorPool descriptorPool = pvkCreateDescriptorPool(logicalGPU);
+	VkDescriptorPool descriptorPool = pvkCreateDescriptorPool(logicalGPU, 4, 3, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1,
+																		  	 VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 2,
+																		  	 VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1);
 	VkDescriptorSetLayout setLayouts[4] = 
 	{ 
 		pvkCreateDescriptorSetLayout(logicalGPU),				// input_attachment (binding = 0)
@@ -440,10 +473,10 @@ int main()
 	VkPipelineLayout pipelineLayout = pvkCreatePipelineLayout(logicalGPU, 3, &setLayouts[1]);
 	VkPipelineLayout pipelineLayout2 = pvkCreatePipelineLayout(logicalGPU, 3, &setLayouts[0]);
 	VkPipelineLayout shadowMapPipelineLayout = pvkCreatePipelineLayout(logicalGPU, 2, &setLayouts[1]);
-	VkPipeline pipeline = pvkCreateGraphicsPipeline(logicalGPU, pipelineLayout, renderPass, 0, 800, 800, 2,
+	VkPipeline pipeline = pvkCreateGraphicsPipeline(logicalGPU, pipelineLayout, renderPass, 0, 1, 800, 800, 2,
 													(PvkShader) { fragmentShader, PVK_SHADER_TYPE_FRAGMENT },
 													(PvkShader) { vertexShader, PVK_SHADER_TYPE_VERTEX });
-	VkPipeline pipeline2 = pvkCreateGraphicsPipeline(logicalGPU, pipelineLayout2, renderPass, 1, 800, 800, 2,
+	VkPipeline pipeline2 = pvkCreateGraphicsPipeline(logicalGPU, pipelineLayout2, renderPass, 1, 1, 800, 800, 2,
 													(PvkShader) { fragmentShaderPass2, PVK_SHADER_TYPE_FRAGMENT },
 													(PvkShader) { vertexShaderPass2, PVK_SHADER_TYPE_VERTEX });
 	VkPipeline shadowMapPipeline = pvkCreateShadowMapGraphicsPipeline(logicalGPU, shadowMapPipelineLayout, shadowMapRenderPass, 0, 800, 800, 1,
@@ -462,40 +495,21 @@ int main()
 	clearValues[2].depthStencil.depth = 1;
 
 	/* Command buffer recording */
-	for(int index = 0; index < 3; index++)
-	{
-		pvkBeginCommandBuffer(commandBuffers[index]);
-
-		/* shadow map renderpass */
-		VkClearValue shadowMapClearValue = { .depthStencil = { .depth = 1.0f, .stencil = 0.0f } };
-		pvkBeginRenderPass(commandBuffers[index], shadowMapRenderPass, *shadowMapFramebuffer, 800, 800, 1, &shadowMapClearValue);
-		vkCmdBindPipeline(commandBuffers[index], VK_PIPELINE_BIND_POINT_GRAPHICS, shadowMapPipeline);
-		vkCmdBindDescriptorSets(commandBuffers[index], VK_PIPELINE_BIND_POINT_GRAPHICS, shadowMapPipelineLayout, 0, 2, &set[1], 0, NULL);
-		pvkDrawGeometry(commandBuffers[index], planeGeometry);
-		pvkDrawGeometry(commandBuffers[index], boxGeometry);
-		pvkEndRenderPass(commandBuffers[index]);
-
-		/* color renderpass */
-		pvkBeginRenderPass(commandBuffers[index], renderPass, framebuffers[index], 800, 800, 3, clearValues);
-
-		/* first subpass */
-		vkCmdBindPipeline(commandBuffers[index], VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
-		vkCmdBindDescriptorSets(commandBuffers[index], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 3, &set[1], 0, NULL);
-		pvkDrawGeometry(commandBuffers[index], planeGeometry);
-		pvkDrawGeometry(commandBuffers[index], boxGeometry);
-
-		vkCmdNextSubpass(commandBuffers[index], VK_SUBPASS_CONTENTS_INLINE);
-
-		/* second subpass */
-		vkCmdBindPipeline(commandBuffers[index], VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline2);
-		vkCmdBindDescriptorSets(commandBuffers[index], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout2, 0, 3, &set[0], 0, NULL);
-		pvkDrawGeometry(commandBuffers[index], planeGeometry);
-		pvkDrawGeometry(commandBuffers[index], boxGeometry);
-
-		pvkEndRenderPass(commandBuffers[index]);
-
-		pvkEndCommandBuffer(commandBuffers[index]);
-	}
+	recordCommandBuffers(800, 800, commandBuffers,
+								clearValues,
+								renderPass, 
+								shadowMapRenderPass, 
+								shadowMapFramebuffer,
+								framebuffers,
+								shadowMapPipeline,
+								pipeline,
+								pipeline2,
+								shadowMapPipelineLayout,
+								pipelineLayout,
+								pipelineLayout2,
+								set,
+								planeGeometry,
+								boxGeometry);
 
 	float angle = 0;
 	/* Rendering & Presentation */
@@ -513,15 +527,123 @@ int main()
 		pvkSubmit(commandBuffers[index], graphicsQueue, imageAvailableSemaphore, renderFinishSemaphore);
 
 		// present the output image
-		pvkPresent(index, swapchain, presentQueue, renderFinishSemaphore);
+		if(!pvkPresent(index, swapchain, presentQueue, renderFinishSemaphore))
+		{
+			vkDestroySurfaceKHR(instance, surface, NULL);;
+			vkDestroyPipeline(logicalGPU, shadowMapPipeline, NULL);
+			vkDestroyPipeline(logicalGPU, pipeline2, NULL);
+			vkDestroyPipeline(logicalGPU, pipeline, NULL);
+			delete(shadowMapFramebuffer);
+			vkDestroyImageView(logicalGPU, shadowMapAttachment, NULL);
+			pvkDestroyImage(logicalGPU, shadowMapImage);
+			delete(framebuffers);
+			vkDestroyImageView(logicalGPU, depthAttachment, NULL);
+			pvkDestroyImage(logicalGPU, depthImage);
+			vkDestroyImageView(logicalGPU, auxAttachment, NULL);
+			pvkDestroyImage(logicalGPU, auxImage);
+			pvkDestroySwapchainImageViews(logicalGPU, swapchain, swapchainImageViews);
+			vkDestroySwapchainKHR(logicalGPU, swapchain, NULL);
+
+			surface = pvkWindowCreateVulkanSurface(window, instance);
+			swapchain = pvkCreateSwapchain(logicalGPU, surface, 
+													window->width, window->height, 
+													VK_FORMAT_B8G8R8A8_SRGB, 
+													VK_COLOR_SPACE_SRGB_NONLINEAR_KHR, 
+													VK_PRESENT_MODE_FIFO_KHR,
+													2, queueFamilyIndices, VK_NULL_HANDLE);
+			swapchainImageViews = pvkCreateSwapchainImageViews(logicalGPU, swapchain, VK_FORMAT_B8G8R8A8_SRGB);
+
+			auxImage = pvkCreateImage(physicalGPU, logicalGPU, 
+										VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, 
+										VK_FORMAT_B8G8R8A8_SRGB, window->width, window->height, 
+										VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT, 
+										2, queueFamilyIndices);
+			auxAttachment = pvkCreateImageView(logicalGPU, auxImage.handle, VK_FORMAT_B8G8R8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT);
+			
+			depthImage = pvkCreateImage(physicalGPU, logicalGPU, 
+										VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+										VK_FORMAT_D32_SFLOAT, window->width, window->height,
+										VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+										2, queueFamilyIndices);
+			depthAttachment = pvkCreateImageView(logicalGPU, depthImage.handle, VK_FORMAT_D32_SFLOAT, VK_IMAGE_ASPECT_DEPTH_BIT);
+			
+			attachments[0] = swapchainImageViews[0];
+			attachments[1] = auxAttachment;
+			attachments[2] = depthAttachment;				// framebuffer for swapchain image 0
+			attachments[3] = swapchainImageViews[1];
+			attachments[4] = auxAttachment;
+			attachments[5] = depthAttachment;				// framebuffer for swapchain image 1
+			attachments[6] = swapchainImageViews[2];
+			attachments[7] = auxAttachment;
+			attachments[8] = depthAttachment;				// framebuffer for swapchain image 2
+			framebuffers = pvkCreateFramebuffers(logicalGPU, renderPass, window->width, window->height, 3, 3, attachments);
+
+			shadowMapImage = pvkCreateImage(physicalGPU, logicalGPU,
+												VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+												VK_FORMAT_D32_SFLOAT, window->width, window->height,
+												VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+												2, queueFamilyIndices);
+			shadowMapAttachment = pvkCreateImageView(logicalGPU, shadowMapImage.handle, VK_FORMAT_D32_SFLOAT, VK_IMAGE_ASPECT_DEPTH_BIT);
+			shadowMapFramebuffer = pvkCreateFramebuffers(logicalGPU, shadowMapRenderPass, window->width, window->height, 1, 1, &shadowMapAttachment);
+
+			pipeline = pvkCreateGraphicsPipeline(logicalGPU, pipelineLayout, renderPass, 0, 1, window->width, window->height, 2,
+													(PvkShader) { fragmentShader, PVK_SHADER_TYPE_FRAGMENT },
+													(PvkShader) { vertexShader, PVK_SHADER_TYPE_VERTEX });
+			pipeline2 = pvkCreateGraphicsPipeline(logicalGPU, pipelineLayout2, renderPass, 1, 1, window->width, window->height, 2,
+													(PvkShader) { fragmentShaderPass2, PVK_SHADER_TYPE_FRAGMENT },
+													(PvkShader) { vertexShaderPass2, PVK_SHADER_TYPE_VERTEX });
+			shadowMapPipeline = pvkCreateShadowMapGraphicsPipeline(logicalGPU, shadowMapPipelineLayout, shadowMapRenderPass, 0, window->width, window->height, 1,
+													(PvkShader) { shadowMapVertexShader, PVK_SHADER_TYPE_VERTEX });
+
+			delete(camera);
+			camera = pvkCreateCamera((float)window->width / window->height, PVK_PROJECTION_TYPE_PERSPECTIVE, 65 DEG);	
+			PvkGlobalData* globalData = new(PvkGlobalData);
+			globalData->projectionMatrix = pvkMat4Transpose(camera->projection);
+			globalData->viewMatrix = pvkMat4Transpose(camera->view);
+			globalData->dirLight.dir = pvkVec3Normalize((PvkVec3) { 1, -1, 0 });
+			globalData->dirLight.intensity = 1.0f;
+			globalData->dirLight.color = (PvkVec3) { 1, 1, 1 };
+			globalData->lightProjectionMatrix = pvkMat4Transpose(pvkMat4OrthoProj(10, 1, 1, 20));
+			globalData->lightViewMatrix = pvkMat4Transpose(pvkMat4Inverse(pvkMat4Mul(pvkMat4Translate((PvkVec3) { -4.0f, 4.0f, 0 }), pvkMat4Rotate((PvkVec3) { -20 DEG, -90 DEG, 0 }))));
+			globalData->ambLight.color = (PvkVec3) { 0.3f, 0.3f, 0.3f };
+			globalData->ambLight.intensity = 1.0f;
+			objectData->modelMatrix = pvkMat4Transpose(pvkMat4Rotate((PvkVec3) { 0 DEG, 0, 0 }));
+			objectData->normalMatrix = pvkMat4Inverse(objectData->modelMatrix);
+			pvkUploadToMemory(logicalGPU, globalUniformBuffer.memory, globalData, sizeof(PvkGlobalData));
+			pvkUploadToMemory(logicalGPU, objectUniformBuffer.memory, objectData, sizeof(PvkObjectData));
+			delete(globalData);
+
+			pvkWriteImageViewToDescriptor(logicalGPU, set[0], 0, auxAttachment, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT);
+			pvkWriteImageViewToDescriptor(logicalGPU, set[3], 3, shadowMapAttachment, shadowMapSampler, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+
+
+			recordCommandBuffers(window->width, window->height, commandBuffers,
+								clearValues,
+								renderPass, 
+								shadowMapRenderPass, 
+								shadowMapFramebuffer,
+								framebuffers,
+								shadowMapPipeline,
+								pipeline,
+								pipeline2,
+								shadowMapPipelineLayout,
+								pipelineLayout,
+								pipelineLayout2,
+								set,
+								planeGeometry,
+								boxGeometry);
+		}
 
 		pvkWindowPollEvents(window);
 	}
+
+	PVK_CHECK(vkDeviceWaitIdle(logicalGPU));
 
 	delete(clearValues);
 	delete(objectData);
 	delete(camera);
 	pvkDestroyGeometry(logicalGPU, planeGeometry);
+	pvkDestroyGeometry(logicalGPU, boxGeometry);
 	vkDestroyShaderModule(logicalGPU, shadowMapFragmentShader, NULL);
 	vkDestroyShaderModule(logicalGPU, shadowMapVertexShader, NULL);
 	vkDestroyShaderModule(logicalGPU, fragmentShaderPass2, NULL);
