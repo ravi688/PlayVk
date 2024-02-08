@@ -900,10 +900,10 @@ static bool pvkPresent(uint32_t index, VkSwapchainKHR  swapchain, VkQueue queue,
 	return true;
 }
 
-static void pvkBeginCommandBuffer(VkCommandBuffer commandBuffer)
+static void pvkBeginCommandBuffer(VkCommandBuffer commandBuffer, VkCommandBufferUsageFlagBits usageFlagBits)
 {
 	PVK_CHECK(vkResetCommandBuffer(commandBuffer, 0));
-	VkCommandBufferBeginInfo beginInfo = { .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
+	VkCommandBufferBeginInfo beginInfo = { .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO, .flags = usageFlagBits };
 	PVK_CHECK(vkBeginCommandBuffer(commandBuffer, &beginInfo));
 }
 

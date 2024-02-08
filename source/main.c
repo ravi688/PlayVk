@@ -313,7 +313,7 @@ static void recordCommandBuffers(u32 width, u32 height, VkCommandBuffer* command
 {
 	for(int index = 0; index < 3; index++)
 	{
-		pvkBeginCommandBuffer(commandBuffers[index]);
+		pvkBeginCommandBuffer(commandBuffers[index], VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT);
 
 		/* shadow map renderpass */
 		VkClearValue shadowMapClearValue = { .depthStencil = { .depth = 1.0f, .stencil = 0.0f } };
