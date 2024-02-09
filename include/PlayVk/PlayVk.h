@@ -860,6 +860,13 @@ static VkSemaphore pvkCreateSemaphore(VkDevice device)
 	return semaphore;
 }
 
+static VkFence pvkCreateFence(VkDevice device)
+{
+	VkFenceCreateInfo cInfo = { .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
+	VkFence fence;
+	PVK_CHECK(vkCreateFence(device, &cInfo, NULL, &fence));
+	return fence;
+}
 
 static void pvkSubmit(VkCommandBuffer commandBuffer, VkQueue queue, VkSemaphore wait, VkSemaphore signal)
 {
