@@ -12,32 +12,59 @@
 #include <string.h> 		// memset
 #include <math.h> 			// sin, cos
 
+
+/* Configuration */
+#define PVK_STATIC static
+#define PVK_LINKAGE static
+#define PVK_INLINE inline
+
+#if defined(__cpluscplus) && (__cpluscplus >= 201103L)
+#	define PVK_CONSTEXPR constexpr
+#else
+#	define PVK_CONSTEXPR const
+#endif /* C++11 */
+
 /* Logging functions */
 #define PVK_FETAL_ERROR(...) debug_log_fetal_error(__VA_ARGS__)
 #define PVK_WARNING(...) debug_log_warning( __VA_ARGS__)
 #define PVK_ERROR(...) debug_log_error(__VA_ARGS__)
 #define PVK_INFO(...) debug_log_info(__VA_ARGS__)
 #define PVK_LOG(description, ...) debug_log(description, __LINE__, __FUNCTION__, __FILE__, __VA_ARGS__)
+#define PVK_ASSERT(condition) _assert(condition)
+
+/* Memory functions */
+#define PVK_MALLOC(size) malloc(size)
+#define PVK_FREE(ptr) free(ptr)
+#define PVK_MEMSET(ptr, u8Value, count) memset(ptr, u8Value, count)
+
+#define new(type) (type*)__new(sizeof(type))
+#define newv(type, count) (type*)__new(sizeof(type) * count)
+PVK_STATIC PVK_INLINE void* __new(size_t size) { void* block = PVK_MALLOC(size); PVK_MEMSET(block, 0, size); return block; }
+#define delete(ptr) __delete((char**)&(ptr))
+PVK_STATIC PVK_INLINE void __delete(char** ptr) 
+{ 
+	if(*ptr == NULL) {  PVK_WARNING("You are trying to free an invalid memory block, ptr = NULL"); return;  }
+	PVK_FREE((void*)(*ptr)); 
+	*ptr = NULL; 
+}
 
 /* Mathematics */
 
-static const double PVK_PI = 3.1415926;
-static const double PVK_INVERSE_PI = 0.3183098;
-static const double PVK_INVERSE_180 = 0.0055555;
-static const double PVK_RAD2DEG = PVK_INVERSE_PI * 180.0;
-static const double PVK_DEG2RAD = PVK_INVERSE_180 * PVK_PI;
-#ifndef DEG
-#	define DEG * PVK_DEG2RAD
-#endif
-#define RAD
+PVK_STATIC PVK_CONSTEXPR double PVK_PI = 3.1415926;
+PVK_STATIC PVK_CONSTEXPR double PVK_INVERSE_PI = 0.3183098;
+PVK_STATIC PVK_CONSTEXPR double PVK_INVERSE_180 = 0.0055555;
+PVK_STATIC PVK_CONSTEXPR double PVK_RAD2DEG = PVK_INVERSE_PI * 180.0;
+PVK_STATIC PVK_CONSTEXPR double PVK_DEG2RAD = PVK_INVERSE_180 * PVK_PI;
+#define PVK_DEG * PVK_DEG2RAD
+#define PVK_RAD
 
-static void __pvkScaleFloats(uint32_t count, float* const values, const float scalar)
+PVK_STATIC PVK_INLINE PVK_CONSTEXPR void __pvkScaleFloats(uint32_t count, float* const values, const float scalar)
 {
 	for(int i = 0; i < count; i++)
 		values[i] *= scalar;
 }
 
-static float __pvkMat3Det(float m[3][3])
+PVK_STATIC PVK_INLINE PVK_CONSTEXPR float __pvkMat3Det(float m[3][3])
 {
 	return m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1]) 
 			- m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0]) 
@@ -71,8 +98,8 @@ typedef union PvkVec3
 	PvkVec2 xy;
 } PvkVec3;
 
-static float pvkVec3Magnitude(PvkVec3 v) { return sqrt(v.x*v.x + v.y*v.y + v.z*v.z); }
-static PvkVec3 pvkVec3Normalize(PvkVec3 v) { float m = 1 / pvkVec3Magnitude(v); return (PvkVec3){ v.x*m, v.y*m, v.z*m }; }
+PVK_STATIC PVK_INLINE PVK_CONSTEXPR float pvkVec3Magnitude(PvkVec3 v) { return sqrt(v.x*v.x + v.y*v.y + v.z*v.z); }
+PVK_STATIC PVK_INLINE PVK_CONSTEXPR PvkVec3 pvkVec3Normalize(PvkVec3 v) { float m = 1 / pvkVec3Magnitude(v); return (PvkVec3){ v.x*m, v.y*m, v.z*m }; }
 
 typedef union PvkVec4
 {
@@ -93,7 +120,7 @@ typedef union PvkVec4
 	PvkVec3 xyz;
 } PvkVec4;
 
-static inline PvkVec4 pvkVec4Zero() { return (PvkVec4) { 0, 0, 0, 0 }; }
+PVK_STATIC PVK_INLINE PVK_CONSTEXPR PvkVec4 pvkVec4Zero() { return (PvkVec4) { 0, 0, 0, 0 }; }
 
 typedef union PvkMat4
 {
@@ -110,7 +137,7 @@ typedef union PvkMat4
 	};
 } PvkMat4;
 
-static PvkMat4 pvkMat4Identity()
+PVK_STATIC PVK_INLINE PVK_CONSTEXPR PvkMat4 pvkMat4Identity()
 {
 	return (PvkMat4)
 	{
@@ -121,9 +148,9 @@ static PvkMat4 pvkMat4Identity()
 	};
 }
 
-static inline PvkMat4 pvkMat4Zero() { return (PvkMat4) { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }; }
+PVK_STATIC PVK_INLINE PVK_CONSTEXPR PvkMat4 pvkMat4Zero() { return (PvkMat4) { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }; }
 
-static PvkMat4 pvkMat4Mul(PvkMat4 m1, PvkMat4 m2)
+PVK_LINKAGE PvkMat4 pvkMat4Mul(PvkMat4 m1, PvkMat4 m2)
 {
 	PvkMat4 m = pvkMat4Zero();
 	for(int i = 0; i < 4; i++)
@@ -133,7 +160,7 @@ static PvkMat4 pvkMat4Mul(PvkMat4 m1, PvkMat4 m2)
 	return m;
 }
 
-static PvkMat4 pvkMat4Transpose(PvkMat4 m)
+PVK_LINKAGE PvkMat4 pvkMat4Transpose(PvkMat4 m)
 {
 	for(int i = 0; i < 4; i++)
 		for(int j = i + 1; j < 4; j++)
@@ -145,7 +172,7 @@ static PvkMat4 pvkMat4Transpose(PvkMat4 m)
 	return m;
 }
 
-static PvkMat4 pvkCofactorMatrix(PvkMat4 m)
+PVK_LINKAGE PvkMat4 pvkCofactorMatrix(PvkMat4 m)
 {
 	PvkMat4 result;
 	float minor[3][3];
@@ -171,12 +198,12 @@ static PvkMat4 pvkCofactorMatrix(PvkMat4 m)
 }
 
 /* NOTE: This is not working as expected */
-static inline PvkMat4 pvkMat4Adjoint(PvkMat4 m)
+PVK_LINKAGE PvkMat4 pvkMat4Adjoint(PvkMat4 m)
 {
 	return pvkMat4Transpose(pvkCofactorMatrix(m));
 }
 
-static float pvkMat4Determinant(PvkMat4 m)
+PVK_LINKAGE float pvkMat4Determinant(PvkMat4 m)
 {
 	float minor[3][3];
 	float det = 0;
@@ -205,7 +232,7 @@ static float pvkMat4Determinant(PvkMat4 m)
 // 	return result;
 // }
 
-static PvkMat4 pvkMat4Inverse(PvkMat4 m)
+PVK_LINKAGE PvkMat4 pvkMat4Inverse(PvkMat4 m)
 {
 	float inverse_det = 1 / pvkMat4Determinant(m);
 	PvkMat4 _m;
@@ -246,7 +273,7 @@ static PvkMat4 pvkMat4Inverse(PvkMat4 m)
 
 /* Affine transformation */
 
-static PvkVec4 pvkMat4MulVec4(PvkMat4 m, PvkVec4 v)
+PVK_LINKAGE PvkVec4 pvkMat4MulVec4(PvkMat4 m, PvkVec4 v)
 {
 	PvkVec4 fv = pvkVec4Zero();
 	for(int i = 0; i < 4; i++)
@@ -255,7 +282,7 @@ static PvkVec4 pvkMat4MulVec4(PvkMat4 m, PvkVec4 v)
 	return fv;
 }
 
-static PvkMat4 pvkMat4Translate(PvkVec3 displacement)
+PVK_STATIC PVK_INLINE PVK_CONSTEXPR PvkMat4 pvkMat4Translate(PvkVec3 displacement)
 {
 	return (PvkMat4)
 	{
@@ -266,7 +293,7 @@ static PvkMat4 pvkMat4Translate(PvkVec3 displacement)
 	};
 }
 
-static PvkMat4 pvkMat4Rotate(PvkVec3 v)
+PVK_LINKAGE PvkMat4 pvkMat4Rotate(PvkVec3 v)
 {
 	float xc0 = cos(v.x), xs0 = sin(v.x);
 	float yc0 = cos(v.y), ys0 = sin(v.y);
@@ -292,7 +319,7 @@ static PvkMat4 pvkMat4Rotate(PvkVec3 v)
 	}));
 }
 
-static PvkMat4 pvkMat4Scale(PvkVec3 v)
+PVK_STATIC PVK_INLINE PVK_CONSTEXPR PvkMat4 pvkMat4Scale(PvkVec3 v)
 {
 	return (PvkMat4)
 	{
@@ -303,27 +330,15 @@ static PvkMat4 pvkMat4Scale(PvkVec3 v)
 	};
 }
 
-static PvkMat4 pvkMat4Transform(PvkVec3 position, PvkVec3 rotation)
+PVK_LINKAGE PvkMat4 pvkMat4Transform(PvkVec3 position, PvkVec3 rotation)
 {
 	return pvkMat4Mul(pvkMat4Translate(position), pvkMat4Rotate(rotation));
-}
-
-/* Memory functions */
-#define new(type) (type*)__new(sizeof(type))
-#define newv(type, count) (type*)__new(sizeof(type) * count)
-static void* __new(size_t size) { void* block = malloc(size); memset(block, 0, size); return block; }
-#define delete(ptr) __delete((char**)&(ptr))
-static void __delete(char** ptr) 
-{ 
-	if(*ptr == NULL) {  PVK_WARNING("You are trying to free an invalid memory block, ptr = NULL"); return;  }
-	free((void*)(*ptr)); 
-	*ptr = NULL; 
 }
 
 /* Resulting checking */
 #define PVK_CHECK(result) pvkCheckResult(result, __LINE__, __FUNCTION__, __FILE__)
 
-static void pvkCheckResult(VkResult result, uint32_t line_no, const char* function_name, const char* source_name)
+PVK_LINKAGE void pvkCheckResult(VkResult result, uint32_t line_no, const char* function_name, const char* source_name)
 {
 	if(result != VK_SUCCESS)
 		PVK_FETAL_ERROR("Result != VK_SUCCESS, Result = %lld", result);
@@ -342,20 +357,20 @@ typedef struct PvkWindow
 
 
 #if GLOBAL_DEBUG
-static void glfwErrorCallback(int code, const char* description)
+PVK_LINKAGE void glfwErrorCallback(int code, const char* description)
 {
 	PVK_ERROR("GLFW: %d, %s", code, description);
 }
 #endif
 
-static void windowResizeCallbackHandler(GLFWwindow* window, int width, int height)
+PVK_LINKAGE void windowResizeCallbackHandler(GLFWwindow* window, int width, int height)
 {
 	PvkWindow* pvkWindow = (PvkWindow*)glfwGetWindowUserPointer(window);
 	pvkWindow->width = width;
 	pvkWindow->height = height;
 }
 
-static PvkWindow* pvkWindowCreate(uint32_t width, uint32_t height, const char* title, bool full_screen, bool resizable)
+PVK_LINKAGE PvkWindow* pvkWindowCreate(uint32_t width, uint32_t height, const char* title, bool full_screen, bool resizable)
 {
 	PvkWindow* window = new(PvkWindow);
 	glfwInit();
@@ -372,29 +387,29 @@ static PvkWindow* pvkWindowCreate(uint32_t width, uint32_t height, const char* t
 	return window;
 }
 
-static bool pvkWindowShouldClose(PvkWindow* window)
+PVK_STATIC PVK_INLINE bool pvkWindowShouldClose(PvkWindow* window)
 {
 	return glfwWindowShouldClose(window->handle);
 }
 
-static void pvkWindowPollEvents(PvkWindow* window)
+PVK_STATIC PVK_INLINE void pvkWindowPollEvents(PvkWindow* window)
 {
 	glfwPollEvents();
 }
 
-static void pvkWindowDestroy(PvkWindow* window)
+PVK_LINKAGE void pvkWindowDestroy(PvkWindow* window)
 {
 	glfwDestroyWindow(window->handle);
 	glfwTerminate();
 	delete(window);
 }
 
-static void pvkWindowGetFramebufferExtent(PvkWindow* window, uint32_t* out_width, uint32_t* out_height)
+PVK_STATIC PVK_INLINE void pvkWindowGetFramebufferExtent(PvkWindow* window, uint32_t* out_width, uint32_t* out_height)
 {
 	glfwGetFramebufferSize(window->handle, out_width, out_height);
 }
 
-static VkSurfaceKHR pvkWindowCreateVulkanSurface(PvkWindow* window, VkInstance instance)
+PVK_LINKAGE VkSurfaceKHR pvkWindowCreateVulkanSurface(PvkWindow* window, VkInstance instance)
 {
 	VkSurfaceKHR surface;
 	PVK_CHECK(glfwCreateWindowSurface(instance, window->handle, NULL, &surface));
@@ -412,7 +427,7 @@ typedef struct PvkEnabledLayerAndExtensionInfo
 	const char* const* extensionNames;
 } PvkEnabledLayerAndExtensionInfo;
 
-static void __pvkCheckForInstanceExtensionSupport(uint32_t count, const char* const* extensions)
+PVK_LINKAGE void __pvkCheckForInstanceExtensionSupport(uint32_t count, const char* const* extensions)
 {
 	uint32_t supportedCount;
 	PVK_CHECK(vkEnumerateInstanceExtensionProperties(NULL, &supportedCount, NULL));
@@ -436,7 +451,7 @@ static void __pvkCheckForInstanceExtensionSupport(uint32_t count, const char* co
 	delete(supportedExtensions);
 }
 
-static VkInstance __pvkCreateVulkanInstance(const char* appName, uint32_t appVersion, uint32_t apiVersion, PvkEnabledLayerAndExtensionInfo* enabledInfo)
+PVK_LINKAGE VkInstance __pvkCreateVulkanInstance(const char* appName, uint32_t appVersion, uint32_t apiVersion, PvkEnabledLayerAndExtensionInfo* enabledInfo)
 {
 	VkInstance instance;
 	VkApplicationInfo appInfo = 
@@ -463,7 +478,7 @@ static VkInstance __pvkCreateVulkanInstance(const char* appName, uint32_t appVer
 	return instance;
 }
 
-static VkInstance pvkCreateVulkanInstanceWithExtensions(uint32_t count, ...)
+PVK_LINKAGE VkInstance pvkCreateVulkanInstanceWithExtensions(uint32_t count, ...)
 {
 	const char* extensions[count];
 	uint32_t extensionCount = count;
@@ -509,7 +524,7 @@ typedef struct PvkPhysicalDeviceRequirements
 	uint32_t imageHeight;			// image height in the swapchain
 } PvkPhysicalDeviceRequirements;
 
-static bool __pvkIsPresentModeSupported(VkPhysicalDevice device, VkSurfaceKHR surface, VkPresentModeKHR mode)
+PVK_LINKAGE bool __pvkIsPresentModeSupported(VkPhysicalDevice device, VkSurfaceKHR surface, VkPresentModeKHR mode)
 {
 	uint32_t presentModeCount;
 	PVK_CHECK(vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentModeCount, NULL));
@@ -529,7 +544,7 @@ static bool __pvkIsPresentModeSupported(VkPhysicalDevice device, VkSurfaceKHR su
 	return isPresentModeSupported;
 }
 
-static bool __pvkIsSurfaceFormatSupported(VkPhysicalDevice device, VkSurfaceKHR surface, VkSurfaceFormatKHR surfaceFormat)
+PVK_LINKAGE bool __pvkIsSurfaceFormatSupported(VkPhysicalDevice device, VkSurfaceKHR surface, VkSurfaceFormatKHR surfaceFormat)
 {
 	uint32_t formatCount;
 	PVK_CHECK(vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount, NULL));
@@ -549,7 +564,7 @@ static bool __pvkIsSurfaceFormatSupported(VkPhysicalDevice device, VkSurfaceKHR 
 	return isFormatSupported;
 }
 
-static bool __pvkIsDeviceTypeSupported(VkPhysicalDevice device, VkPhysicalDeviceType type)
+PVK_LINKAGE bool __pvkIsDeviceTypeSupported(VkPhysicalDevice device, VkPhysicalDeviceType type)
 {
 	VkPhysicalDeviceProperties properties;
 	vkGetPhysicalDeviceProperties(device, &properties);
@@ -557,7 +572,7 @@ static bool __pvkIsDeviceTypeSupported(VkPhysicalDevice device, VkPhysicalDevice
 	return properties.deviceType == type;
 }
 
-static bool __pvkIsDeviceFeaturesSupported(VkPhysicalDevice device, VkPhysicalDeviceFeatures* requiredFeatures)
+PVK_LINKAGE bool __pvkIsDeviceFeaturesSupported(VkPhysicalDevice device, VkPhysicalDeviceFeatures* requiredFeatures)
 {
 	VkPhysicalDeviceFeatures features;
 	vkGetPhysicalDeviceFeatures(device, &features);
@@ -572,7 +587,7 @@ static bool __pvkIsDeviceFeaturesSupported(VkPhysicalDevice device, VkPhysicalDe
 	return isSupported;
 }
 
-static bool __pvkIsPhysicalDeviceSuitable(VkPhysicalDevice device, VkSurfaceKHR surface, PvkPhysicalDeviceRequirements* requirements)
+PVK_LINKAGE bool __pvkIsPhysicalDeviceSuitable(VkPhysicalDevice device, VkSurfaceKHR surface, PvkPhysicalDeviceRequirements* requirements)
 {
 
 	VkSurfaceCapabilitiesKHR capabilities;
@@ -596,7 +611,7 @@ static bool __pvkIsPhysicalDeviceSuitable(VkPhysicalDevice device, VkSurfaceKHR 
 			&& __pvkIsDeviceFeaturesSupported(device, &requiredFeatures);
 }
 
-static VkPhysicalDevice pvkGetPhysicalDevice(VkInstance instance, VkSurfaceKHR surface, 
+PVK_LINKAGE VkPhysicalDevice pvkGetPhysicalDevice(VkInstance instance, VkSurfaceKHR surface, 
 											VkPhysicalDeviceType gpuType, 
 											VkFormat format, 
 											VkColorSpaceKHR colorSpace, 
@@ -651,7 +666,7 @@ static VkPhysicalDevice pvkGetPhysicalDevice(VkInstance instance, VkSurfaceKHR s
 }
 
 
-static uint32_t pvkFindQueueFamilyIndex(VkPhysicalDevice device, VkQueueFlags queueFlags)
+PVK_LINKAGE uint32_t pvkFindQueueFamilyIndex(VkPhysicalDevice device, VkQueueFlags queueFlags)
 {
 	uint32_t count;
 	vkGetPhysicalDeviceQueueFamilyProperties(device, &count, NULL);
@@ -672,7 +687,7 @@ static uint32_t pvkFindQueueFamilyIndex(VkPhysicalDevice device, VkQueueFlags qu
 	return index;
 }
 
-static uint32_t pvkFindQueueFamilyIndexWithPresentSupport(VkPhysicalDevice device, VkSurfaceKHR surface)
+PVK_LINKAGE uint32_t pvkFindQueueFamilyIndexWithPresentSupport(VkPhysicalDevice device, VkSurfaceKHR surface)
 {
 	uint32_t count;
 	vkGetPhysicalDeviceQueueFamilyProperties(device, &count, NULL);
@@ -687,7 +702,7 @@ static uint32_t pvkFindQueueFamilyIndexWithPresentSupport(VkPhysicalDevice devic
 	return UINT32_MAX;
 }
 
-static void __pvkUnionUInt32(uint32_t count, const uint32_t* values, uint32_t* out_count, uint32_t* out_values)
+PVK_LINKAGE void __pvkUnionUInt32(uint32_t count, const uint32_t* values, uint32_t* out_count, uint32_t* out_values)
 {
 	uint32_t uniqueCount = 0;
 
@@ -698,7 +713,7 @@ static void __pvkUnionUInt32(uint32_t count, const uint32_t* values, uint32_t* o
 			maxValue = values[i];
 
 	// look up table
-	assert(sizeof(bool) == 1);
+	PVK_ASSERT(sizeof(bool) == 1);
 	bool exists[maxValue + 1]; memset(exists, false, maxValue + 1);
 
 	for(int i = 0; i < count; i++)
@@ -713,7 +728,7 @@ static void __pvkUnionUInt32(uint32_t count, const uint32_t* values, uint32_t* o
 	*out_count = uniqueCount;
 }
 
-static VkDevice pvkCreateLogicalDeviceWithExtensions(VkInstance instance, VkPhysicalDevice physicalDevice, 
+PVK_LINKAGE VkDevice pvkCreateLogicalDeviceWithExtensions(VkInstance instance, VkPhysicalDevice physicalDevice, 
 													uint32_t queueFamilyCount, uint32_t* queueFamilyIndices,
 													uint32_t extensionCount, ...)
 {
@@ -784,7 +799,7 @@ static VkDevice pvkCreateLogicalDeviceWithExtensions(VkInstance instance, VkPhys
 	return device;
 }
 
-static VkSwapchainKHR pvkCreateSwapchain(VkDevice device, VkSurfaceKHR surface, 
+PVK_LINKAGE VkSwapchainKHR pvkCreateSwapchain(VkDevice device, VkSurfaceKHR surface, 
 											uint32_t width, uint32_t height, 
 											VkFormat format, VkColorSpaceKHR colorSpace, VkPresentModeKHR presentMode,
 											uint32_t queueFamilyCount, uint32_t* queueFamilyIndices, VkSwapchainKHR oldSwapchain)
@@ -819,7 +834,7 @@ static VkSwapchainKHR pvkCreateSwapchain(VkDevice device, VkSurfaceKHR surface,
 	return swapchain;
 }
 
-static VkCommandPool pvkCreateCommandPool(VkDevice device, VkCommandPoolCreateFlags flags, uint32_t queueFamilyIndex)
+PVK_LINKAGE VkCommandPool pvkCreateCommandPool(VkDevice device, VkCommandPoolCreateFlags flags, uint32_t queueFamilyIndex)
 {
 	VkCommandPoolCreateInfo cInfo = 
 	{
@@ -832,7 +847,7 @@ static VkCommandPool pvkCreateCommandPool(VkDevice device, VkCommandPoolCreateFl
 	return commandPool;
 }
 
-static VkCommandBuffer* __pvkAllocateCommandBuffers(VkDevice device, VkCommandPool pool, VkCommandBufferLevel level, uint32_t count)
+PVK_LINKAGE VkCommandBuffer* __pvkAllocateCommandBuffers(VkDevice device, VkCommandPool pool, VkCommandBufferLevel level, uint32_t count)
 {
 	VkCommandBufferAllocateInfo info = 
 	{
@@ -847,12 +862,12 @@ static VkCommandBuffer* __pvkAllocateCommandBuffers(VkDevice device, VkCommandPo
 	return commandBuffers;
 }
 
-static inline VkCommandBuffer* pvkAllocateCommandBuffers(VkDevice device, VkCommandPool pool, VkCommandBufferLevel level)
+PVK_STATIC PVK_INLINE VkCommandBuffer* pvkAllocateCommandBuffers(VkDevice device, VkCommandPool pool, VkCommandBufferLevel level)
 {
 	return __pvkAllocateCommandBuffers(device, pool, level, 3);
 }
 
-static VkSemaphore pvkCreateSemaphore(VkDevice device)
+PVK_LINKAGE VkSemaphore pvkCreateSemaphore(VkDevice device)
 {
 	VkSemaphoreCreateInfo cInfo = { .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
 	VkSemaphore semaphore;
@@ -860,7 +875,7 @@ static VkSemaphore pvkCreateSemaphore(VkDevice device)
 	return semaphore;
 }
 
-static VkFence pvkCreateFence(VkDevice device, VkFenceCreateFlags flags)
+PVK_LINKAGE VkFence pvkCreateFence(VkDevice device, VkFenceCreateFlags flags)
 {
 	VkFenceCreateInfo cInfo = { .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, .flags = flags };
 	VkFence fence;
@@ -875,10 +890,10 @@ typedef struct PvkSemaphoreCircularPool
 	uint32_t acquiredIndex;
 } PvkSemaphoreCircularPool;
 
-static PvkSemaphoreCircularPool* pvkCreateSemaphoreCircularPool(VkDevice device, uint32_t reserveCount)
+PVK_LINKAGE PvkSemaphoreCircularPool* pvkCreateSemaphoreCircularPool(VkDevice device, uint32_t reserveCount)
 {
 	PvkSemaphoreCircularPool* pool = (PvkSemaphoreCircularPool*)malloc(sizeof(PvkSemaphoreCircularPool));
-	pool->semaphores = (VkSemaphore*)malloc(sizeof(VkSemaphore) * reserveCount);
+	pool->semaphores = (VkSemaphore*)PVK_MALLOC(sizeof(VkSemaphore) * reserveCount);
 	pool->reserveCount = reserveCount;
 	pool->acquiredIndex = 0;
 	for(uint32_t i = 0; i < reserveCount; i++)
@@ -886,15 +901,15 @@ static PvkSemaphoreCircularPool* pvkCreateSemaphoreCircularPool(VkDevice device,
 	return pool;
 }
 
-static void pvkDestroySemaphoreCircularPool(VkDevice device, PvkSemaphoreCircularPool* pool)
+PVK_LINKAGE void pvkDestroySemaphoreCircularPool(VkDevice device, PvkSemaphoreCircularPool* pool)
 {
 	for(uint32_t i = 0; i < pool->reserveCount; i++)
 		vkDestroySemaphore(device, pool->semaphores[i], NULL);
-	memset((void*)pool, 0, sizeof(pool));
-	free(pool);
+	PVK_MEMSET((void*)pool, 0, sizeof(pool));
+	PVK_FREE(pool);
 }
 
-static VkSemaphore pvkSemaphoreCircularPoolAcquire(PvkSemaphoreCircularPool* pool, uint32_t* outIndex)
+PVK_LINKAGE VkSemaphore pvkSemaphoreCircularPoolAcquire(PvkSemaphoreCircularPool* pool, uint32_t* outIndex)
 {
 	VkSemaphore semaphore = pool->semaphores[pool->acquiredIndex];
 	if(outIndex != NULL)
@@ -903,14 +918,14 @@ static VkSemaphore pvkSemaphoreCircularPoolAcquire(PvkSemaphoreCircularPool* poo
 	return semaphore;
 }
 
-static VkSemaphore pvkSemaphoreCircularPoolRecreate(VkDevice device, PvkSemaphoreCircularPool* pool, uint32_t index)
+PVK_LINKAGE VkSemaphore pvkSemaphoreCircularPoolRecreate(VkDevice device, PvkSemaphoreCircularPool* pool, uint32_t index)
 {
 	vkDestroySemaphore(device, pool->semaphores[index], NULL);
 	pool->semaphores[index] = pvkCreateSemaphore(device);
 	return pool->semaphores[index];
 }
 
-static void pvkResetFences(VkDevice device, uint32_t fenceCount, VkFence* fences)
+PVK_LINKAGE void pvkResetFences(VkDevice device, uint32_t fenceCount, VkFence* fences)
 {
 	PVK_CHECK(vkWaitForFences(device, fenceCount, fences, VK_TRUE, 0));
 	PVK_CHECK(vkResetFences(device, fenceCount, fences));
@@ -922,26 +937,26 @@ typedef struct PvkFencePool
 	uint32_t reserveCount;
 } PvkFencePool;
 
-static PvkFencePool* pvkCreateFencePool(VkDevice device, uint32_t reserveCount)
+PVK_LINKAGE PvkFencePool* pvkCreateFencePool(VkDevice device, uint32_t reserveCount)
 {
-	PvkFencePool* pool = (PvkFencePool*)malloc(sizeof(PvkFencePool));
-	pool->fences = (VkFence*)malloc(sizeof(VkFence) * reserveCount);
+	PvkFencePool* pool = (PvkFencePool*)PVK_MALLOC(sizeof(PvkFencePool));
+	pool->fences = (VkFence*)PVK_MALLOC(sizeof(VkFence) * reserveCount);
 	pool->reserveCount = reserveCount;
 	for(uint32_t i = 0; i < reserveCount; i++)
 		pool->fences[i] = pvkCreateFence(device, VK_FENCE_CREATE_SIGNALED_BIT);
 	return pool;
 }
 
-static void pvkDestroyFencePool(VkDevice device, PvkFencePool* pool)
+PVK_LINKAGE void pvkDestroyFencePool(VkDevice device, PvkFencePool* pool)
 {
 	PVK_CHECK(vkWaitForFences(device, pool->reserveCount, pool->fences, VK_TRUE, 0));
 	for(uint32_t i = 0; i < pool->reserveCount; i++)
 		vkDestroyFence(device, pool->fences[i], NULL);
-	memset((void*)pool, 0, sizeof(pool));
-	free(pool);
+	PVK_MEMSET((void*)pool, 0, sizeof(pool));
+	PVK_FREE(pool);
 }
 
-static bool pvkFencePoolAcquire(VkDevice device, PvkFencePool* pool, VkFence* outFence)
+PVK_LINKAGE bool pvkFencePoolAcquire(VkDevice device, PvkFencePool* pool, VkFence* outFence)
 {
 	VkFence* fences = pool->fences;
 	uint32_t fenceCount = pool->reserveCount;
@@ -960,7 +975,7 @@ static bool pvkFencePoolAcquire(VkDevice device, PvkFencePool* pool, VkFence* ou
 }
 
 
-static void pvkSubmit(VkCommandBuffer commandBuffer, VkQueue queue, VkSemaphore wait, VkSemaphore signal, VkFence signalFence)
+PVK_LINKAGE void pvkSubmit(VkCommandBuffer commandBuffer, VkQueue queue, VkSemaphore wait, VkSemaphore signal, VkFence signalFence)
 {
 	VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 	VkSubmitInfo info =
@@ -977,7 +992,7 @@ static void pvkSubmit(VkCommandBuffer commandBuffer, VkQueue queue, VkSemaphore 
 	PVK_CHECK(vkQueueSubmit(queue, 1, &info, signalFence));
 }
 
-static bool pvkAcquireNextImageKHR(VkDevice device, VkSwapchainKHR swapchain, uint64_t timeout, VkSemaphore waitSemaphore, VkFence waitFence, uint32_t* outIndex)
+PVK_LINKAGE bool pvkAcquireNextImageKHR(VkDevice device, VkSwapchainKHR swapchain, uint64_t timeout, VkSemaphore waitSemaphore, VkFence waitFence, uint32_t* outIndex)
 {
 	uint32_t index;
 	VkResult result = vkAcquireNextImageKHR(device, swapchain, timeout, waitSemaphore, waitFence, outIndex);
@@ -988,7 +1003,7 @@ static bool pvkAcquireNextImageKHR(VkDevice device, VkSwapchainKHR swapchain, ui
 	return true;
 }
 
-static bool pvkPresent(uint32_t index, VkSwapchainKHR  swapchain, VkQueue queue, VkSemaphore wait)
+PVK_LINKAGE bool pvkPresent(uint32_t index, VkSwapchainKHR  swapchain, VkQueue queue, VkSemaphore wait)
 {
 	VkResult result;
 	VkPresentInfoKHR info = 
@@ -1001,7 +1016,7 @@ static bool pvkPresent(uint32_t index, VkSwapchainKHR  swapchain, VkQueue queue,
 		.pImageIndices = &index,
 		.pResults = &result
 	};
-	// assert(result == VK_SUCCESS);
+	// PVK_ASSERT(result == VK_SUCCESS);
 	result = vkQueuePresentKHR(queue, &info);
 	if((result == VK_ERROR_OUT_OF_DATE_KHR) || (result == VK_SUBOPTIMAL_KHR))
 		return false;
@@ -1010,19 +1025,19 @@ static bool pvkPresent(uint32_t index, VkSwapchainKHR  swapchain, VkQueue queue,
 	return true;
 }
 
-static void pvkBeginCommandBuffer(VkCommandBuffer commandBuffer, VkCommandBufferUsageFlagBits usageFlagBits)
+PVK_LINKAGE void pvkBeginCommandBuffer(VkCommandBuffer commandBuffer, VkCommandBufferUsageFlagBits usageFlagBits)
 {
 	PVK_CHECK(vkResetCommandBuffer(commandBuffer, 0));
 	VkCommandBufferBeginInfo beginInfo = { .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO, .flags = usageFlagBits };
 	PVK_CHECK(vkBeginCommandBuffer(commandBuffer, &beginInfo));
 }
 
-static inline void pvkEndCommandBuffer(VkCommandBuffer commandBuffer)
+PVK_STATIC PVK_INLINE void pvkEndCommandBuffer(VkCommandBuffer commandBuffer)
 {
 	PVK_CHECK(vkEndCommandBuffer(commandBuffer));
 }
 
-static void pvkBeginRenderPass(VkCommandBuffer commandBuffer, VkRenderPass renderPass, VkFramebuffer framebuffer, uint32_t width, uint32_t height, uint32_t clearValueCount, VkClearValue* clearValues)
+PVK_LINKAGE void pvkBeginRenderPass(VkCommandBuffer commandBuffer, VkRenderPass renderPass, VkFramebuffer framebuffer, uint32_t width, uint32_t height, uint32_t clearValueCount, VkClearValue* clearValues)
 {
 	VkRenderPassBeginInfo beginInfo = 
 	{
@@ -1036,12 +1051,12 @@ static void pvkBeginRenderPass(VkCommandBuffer commandBuffer, VkRenderPass rende
 	vkCmdBeginRenderPass(commandBuffer, &beginInfo, VK_SUBPASS_CONTENTS_INLINE);
 }
 
-static inline void pvkEndRenderPass(VkCommandBuffer commandBuffer)
+PVK_STATIC PVK_INLINE void pvkEndRenderPass(VkCommandBuffer commandBuffer)
 {
 	vkCmdEndRenderPass(commandBuffer);
 }
 
-static VkRenderPass pvkCreateRenderPass(VkDevice device)
+PVK_LINKAGE VkRenderPass pvkCreateRenderPass(VkDevice device)
 {
 	VkAttachmentDescription colorAttachmentDescription = 
 	{
@@ -1082,7 +1097,7 @@ static VkRenderPass pvkCreateRenderPass(VkDevice device)
 }
 
 /* Vulkan Device Memory Allocation */
-static VkDeviceMemory pvkAllocateMemory(VkDevice device, VkDeviceSize size, uint32_t memoryTypeIndex)
+PVK_LINKAGE VkDeviceMemory pvkAllocateMemory(VkDevice device, VkDeviceSize size, uint32_t memoryTypeIndex)
 {
 	VkMemoryAllocateInfo aInfo = 
 	{
@@ -1096,7 +1111,7 @@ static VkDeviceMemory pvkAllocateMemory(VkDevice device, VkDeviceSize size, uint
 	return memory;
 }
 
-static uint32_t __pvkGetMemoryTypeIndexFromMemoryProperty(VkPhysicalDevice device, VkMemoryPropertyFlags propertyFlags)
+PVK_LINKAGE uint32_t __pvkGetMemoryTypeIndexFromMemoryProperty(VkPhysicalDevice device, VkMemoryPropertyFlags propertyFlags)
 {
 	VkPhysicalDeviceMemoryProperties properties;
 	vkGetPhysicalDeviceMemoryProperties(device, &properties);
@@ -1111,13 +1126,13 @@ static uint32_t __pvkGetMemoryTypeIndexFromMemoryProperty(VkPhysicalDevice devic
 	return index;
 }
 
-static void __pvkCheckForMemoryTypesSupport(VkPhysicalDevice device, uint32_t bits)
+PVK_LINKAGE void __pvkCheckForMemoryTypesSupport(VkPhysicalDevice device, uint32_t bits)
 {
 	/* TODO */
 }
 
 /* Vulkan Image & ImageView */
-static VkImage __pvkCreateImage(VkDevice device, VkFormat format, uint32_t width, uint32_t height, VkImageUsageFlags usageFlags, uint32_t queueFamilyIndexCount, uint32_t* queueFamilyIndices)
+PVK_LINKAGE VkImage __pvkCreateImage(VkDevice device, VkFormat format, uint32_t width, uint32_t height, VkImageUsageFlags usageFlags, uint32_t queueFamilyIndexCount, uint32_t* queueFamilyIndices)
 {
 	// union operation
 	uint32_t uniqueQueueFamilyCount;
@@ -1150,7 +1165,7 @@ typedef struct PvkImage
 	VkDeviceMemory memory;
 } PvkImage;
 
-static PvkImage pvkCreateImage(VkPhysicalDevice physicalDevice, VkDevice device, VkMemoryPropertyFlags mflags, VkFormat format, uint32_t width, uint32_t height, VkImageUsageFlags usageFlags, uint32_t queueFamilyIndexCount, uint32_t* queueFamilyIndices)
+PVK_LINKAGE PvkImage pvkCreateImage(VkPhysicalDevice physicalDevice, VkDevice device, VkMemoryPropertyFlags mflags, VkFormat format, uint32_t width, uint32_t height, VkImageUsageFlags usageFlags, uint32_t queueFamilyIndexCount, uint32_t* queueFamilyIndices)
 {
 	VkImage image = __pvkCreateImage(device, format, width, height, usageFlags, queueFamilyIndexCount, queueFamilyIndices);
 	VkMemoryRequirements imageMemoryRequirements;
@@ -1161,13 +1176,13 @@ static PvkImage pvkCreateImage(VkPhysicalDevice physicalDevice, VkDevice device,
 	return (PvkImage) { image, memory };
 }
 
-static void pvkDestroyImage(VkDevice device, PvkImage image)
+PVK_LINKAGE void pvkDestroyImage(VkDevice device, PvkImage image)
 {
 	vkFreeMemory(device, image.memory, NULL);
 	vkDestroyImage(device, image.handle, NULL);
 }
 
-static VkImageView pvkCreateImageView(VkDevice device, VkImage image, VkFormat format, VkImageAspectFlagBits aspectMask)
+PVK_LINKAGE VkImageView pvkCreateImageView(VkDevice device, VkImage image, VkFormat format, VkImageAspectFlagBits aspectMask)
 {
 	VkImageViewCreateInfo cInfo = 
 	{
@@ -1188,12 +1203,12 @@ static VkImageView pvkCreateImageView(VkDevice device, VkImage image, VkFormat f
 	return imageView;
 }
 
-static VkImageView* pvkCreateSwapchainImageViews(VkDevice device, VkSwapchainKHR swapchain, VkFormat format)
+PVK_LINKAGE VkImageView* pvkCreateSwapchainImageViews(VkDevice device, VkSwapchainKHR swapchain, VkFormat format)
 {
 	// get the swapchain images
 	uint32_t imageCount;
 	PVK_CHECK(vkGetSwapchainImagesKHR(device, swapchain, &imageCount, NULL));
-	assert(imageCount == 3);
+	PVK_ASSERT(imageCount == 3);
 	VkImage* images = newv(VkImage, imageCount);
 	PVK_CHECK(vkGetSwapchainImagesKHR(device, swapchain, &imageCount, images));
 
@@ -1205,7 +1220,7 @@ static VkImageView* pvkCreateSwapchainImageViews(VkDevice device, VkSwapchainKHR
 	return imageViews;
 }
 
-static void pvkDestroySwapchainImageViews(VkDevice device, VkSwapchainKHR swapchain, VkImageView* imageViews)
+PVK_LINKAGE void pvkDestroySwapchainImageViews(VkDevice device, VkSwapchainKHR swapchain, VkImageView* imageViews)
 {
 	uint32_t imageCount;
 	PVK_CHECK(vkGetSwapchainImagesKHR(device, swapchain, &imageCount, NULL));
@@ -1215,7 +1230,7 @@ static void pvkDestroySwapchainImageViews(VkDevice device, VkSwapchainKHR swapch
 }
 
 /* Vulkan Frambuffer */
-static VkFramebuffer* pvkCreateFramebuffers(VkDevice device, VkRenderPass renderPass, uint32_t width, uint32_t height, uint32_t fbCount, uint32_t attachmentCount, VkImageView* imageViews)
+PVK_LINKAGE VkFramebuffer* pvkCreateFramebuffers(VkDevice device, VkRenderPass renderPass, uint32_t width, uint32_t height, uint32_t fbCount, uint32_t attachmentCount, VkImageView* imageViews)
 {
 	VkFramebuffer* framebuffers = newv(VkFramebuffer, fbCount);
 	for(int i = 0; i < fbCount; i++)
@@ -1235,38 +1250,38 @@ static VkFramebuffer* pvkCreateFramebuffers(VkDevice device, VkRenderPass render
 	return framebuffers;
 }
 
-static void pvkDestroyFramebuffers(VkDevice device, uint32_t fbCount, VkFramebuffer* framebuffers)
+PVK_LINKAGE void pvkDestroyFramebuffers(VkDevice device, uint32_t fbCount, VkFramebuffer* framebuffers)
 {
 	for(int i = 0; i < fbCount; i++)
 		vkDestroyFramebuffer(device, framebuffers[i], NULL);
 }
 
 /* Shaders & Graphics Pipeline */
-static const char* __pvkLoadBinaryFile(const char* filePath, size_t* out_length)
+PVK_LINKAGE const char* __pvkLoadBinaryFile(const char* filePath, size_t* out_length)
 {
 	FILE* file = fopen(filePath, "rb");
 	if(file == NULL)
 		PVK_FETAL_ERROR("Unable to open the file at path \"%s\"", filePath);
 	int result = fseek(file, 0, SEEK_END);
-	assert(result == 0);
+	PVK_ASSERT(result == 0);
 	size_t length = ftell(file);
 	if(length == 0)
 		PVK_WARNING("File at path \"%s\" is empty", filePath);
 	rewind(file);
 	char* data = newv(char, length);
 	size_t readLength = fread(data, 1, length, file);
-	assert(readLength == length);
+	PVK_ASSERT(readLength == length);
 	fclose(file);
 	if(out_length != NULL)
 		*out_length = length;
 	return data;
 }
 
-static VkShaderModule pvkCreateShaderModule(VkDevice device, const char* filePath)
+PVK_LINKAGE VkShaderModule pvkCreateShaderModule(VkDevice device, const char* filePath)
 {
 	size_t length;
 	const char* bytes = __pvkLoadBinaryFile(filePath, &length);
-	assert((length % 4) == 0);
+	PVK_ASSERT((length % 4) == 0);
 	VkShaderModuleCreateInfo cInfo = 
 	{
 		.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
@@ -1285,7 +1300,7 @@ typedef struct PvkShader
 	PvkShaderType type;
 } PvkShader;
 
-static VkShaderStageFlagBits __pkvShaderTypeToVulkanShaderStage(PvkShaderType type)
+PVK_LINKAGE VkShaderStageFlagBits __pkvShaderTypeToVulkanShaderStage(PvkShaderType type)
 {
 	VkShaderStageFlagBits flags = 0;
 	if(type & PVK_SHADER_TYPE_VERTEX)
@@ -1299,7 +1314,7 @@ static VkShaderStageFlagBits __pkvShaderTypeToVulkanShaderStage(PvkShaderType ty
 	return flags;
 }
 
-static VkPipelineShaderStageCreateInfo* __pvkCreatePipelineShaderStageCreateInfos(uint32_t count, const PvkShader* const shaders)
+PVK_LINKAGE VkPipelineShaderStageCreateInfo* __pvkCreatePipelineShaderStageCreateInfos(uint32_t count, const PvkShader* const shaders)
 {
 	VkPipelineShaderStageCreateInfo* infos = newv(VkPipelineShaderStageCreateInfo, count);
 	for(int i = 0; i < count; i++)
@@ -1339,7 +1354,7 @@ typedef struct PvkVertex
 #define PVK_VERTEX_TEXCOORD_OFFSET offsetof(PvkVertex, texcoord)
 #define PVK_VERTEX_COLOR_OFFSET offsetof(PvkVertex, color)
 
-static VkVertexInputAttributeDescription __pvkGetVertexInputAttributeDescription(uint32_t binding, uint32_t location, VkFormat format, uint32_t offset)
+PVK_STATIC PVK_INLINE PVK_CONSTEXPR VkVertexInputAttributeDescription __pvkGetVertexInputAttributeDescription(uint32_t binding, uint32_t location, VkFormat format, uint32_t offset)
 {
 	return (VkVertexInputAttributeDescription)
 	{
@@ -1350,7 +1365,7 @@ static VkVertexInputAttributeDescription __pvkGetVertexInputAttributeDescription
 	};
 }
 
-static VkPipeline __pvkCreateGraphicsPipeline(VkDevice device, VkPipelineLayout layout, VkRenderPass renderPass, uint32_t subpassIndex, uint32_t width, uint32_t height, VkPipelineColorBlendStateCreateInfo* colorBlend, bool enableDepth, uint32_t count, va_list args)
+PVK_LINKAGE VkPipeline __pvkCreateGraphicsPipeline(VkDevice device, VkPipelineLayout layout, VkRenderPass renderPass, uint32_t subpassIndex, uint32_t width, uint32_t height, VkPipelineColorBlendStateCreateInfo* colorBlend, bool enableDepth, uint32_t count, va_list args)
 {
 	/* Shader modules */
 	PvkShader shaderModules[count];
@@ -1470,7 +1485,7 @@ static VkPipeline __pvkCreateGraphicsPipeline(VkDevice device, VkPipelineLayout 
 }
 
 
-static VkPipeline pvkCreateShadowMapGraphicsPipeline(VkDevice device, VkPipelineLayout layout, VkRenderPass renderPass, uint32_t subpassIndex, uint32_t width, uint32_t height, uint32_t count, ...)
+PVK_LINKAGE VkPipeline pvkCreateShadowMapGraphicsPipeline(VkDevice device, VkPipelineLayout layout, VkRenderPass renderPass, uint32_t subpassIndex, uint32_t width, uint32_t height, uint32_t count, ...)
 {
 	va_list shaderModuleList;
 	va_start(shaderModuleList, count);
@@ -1479,7 +1494,7 @@ static VkPipeline pvkCreateShadowMapGraphicsPipeline(VkDevice device, VkPipeline
 	return pipeline;
 }
 
-static VkPipeline pvkCreateGraphicsPipeline(VkDevice device, VkPipelineLayout layout, VkRenderPass renderPass, uint32_t subpassIndex, uint32_t colorAttachmentCount, uint32_t width, uint32_t height, uint32_t count, ...)
+PVK_LINKAGE VkPipeline pvkCreateGraphicsPipeline(VkDevice device, VkPipelineLayout layout, VkRenderPass renderPass, uint32_t subpassIndex, uint32_t colorAttachmentCount, uint32_t width, uint32_t height, uint32_t count, ...)
 {
 	va_list shaderModuleList;
 	va_start(shaderModuleList, count);
@@ -1510,7 +1525,7 @@ static VkPipeline pvkCreateGraphicsPipeline(VkDevice device, VkPipelineLayout la
 	return pipeline;
 }
 
-static VkPipelineLayout pvkCreatePipelineLayout(VkDevice device, uint32_t setLayoutCount, VkDescriptorSetLayout* setLayouts)
+PVK_LINKAGE VkPipelineLayout pvkCreatePipelineLayout(VkDevice device, uint32_t setLayoutCount, VkDescriptorSetLayout* setLayouts)
 {
 	VkPipelineLayoutCreateInfo cInfo = 
 	{
@@ -1524,7 +1539,7 @@ static VkPipelineLayout pvkCreatePipelineLayout(VkDevice device, uint32_t setLay
 }
 
 /* Vulkan Buffer */
-static VkBuffer __pvkCreateBuffer(VkDevice device, VkBufferUsageFlags usageFlags, VkDeviceSize size, uint32_t queueFamilyCount, uint32_t* queueFamilyIndices)
+PVK_LINKAGE VkBuffer __pvkCreateBuffer(VkDevice device, VkBufferUsageFlags usageFlags, VkDeviceSize size, uint32_t queueFamilyCount, uint32_t* queueFamilyIndices)
 {
 	// union operation
 	uint32_t uniqueQueueFamilyCount;
@@ -1553,7 +1568,7 @@ typedef struct PvkBuffer
 } PvkBuffer;
 
 
-static PvkBuffer pvkCreateBuffer(VkPhysicalDevice physicalDevice, VkDevice device, VkMemoryPropertyFlags mflags, VkBufferUsageFlags flags, VkDeviceSize size, uint32_t queueFamilyCount, uint32_t* queueFamilyIndices)
+PVK_LINKAGE PvkBuffer pvkCreateBuffer(VkPhysicalDevice physicalDevice, VkDevice device, VkMemoryPropertyFlags mflags, VkBufferUsageFlags flags, VkDeviceSize size, uint32_t queueFamilyCount, uint32_t* queueFamilyIndices)
 {
 	VkBuffer buffer = __pvkCreateBuffer(device, flags, size, queueFamilyCount, queueFamilyIndices);
 	VkMemoryRequirements bufferMemoryRequirements;
@@ -1565,13 +1580,13 @@ static PvkBuffer pvkCreateBuffer(VkPhysicalDevice physicalDevice, VkDevice devic
 	return (PvkBuffer) { buffer, memory };
 }
 
-static void pvkDestroyBuffer(VkDevice device, PvkBuffer buffer)
+PVK_LINKAGE void pvkDestroyBuffer(VkDevice device, PvkBuffer buffer)
 {
 	vkDestroyBuffer(device, buffer.handle, NULL);
 	vkFreeMemory(device, buffer.memory, NULL);
 }
 
-static void pvkUploadToMemory(VkDevice device, VkDeviceMemory memory, void* data, size_t size)
+PVK_LINKAGE void pvkUploadToMemory(VkDevice device, VkDeviceMemory memory, void* data, size_t size)
 {
 	void* dst;
 	PVK_CHECK(vkMapMemory(device, memory, 0, size, 0, &dst));
@@ -1581,7 +1596,7 @@ static void pvkUploadToMemory(VkDevice device, VkDeviceMemory memory, void* data
 
 /* Vulkan Descriptor sets */
 
-static VkDescriptorSet* pvkAllocateDescriptorSets(VkDevice device, VkDescriptorPool pool, uint32_t setCount, VkDescriptorSetLayout* setLayouts)
+PVK_LINKAGE VkDescriptorSet* pvkAllocateDescriptorSets(VkDevice device, VkDescriptorPool pool, uint32_t setCount, VkDescriptorSetLayout* setLayouts)
 {
 	VkDescriptorSetAllocateInfo allocInfo = 
 	{
@@ -1596,7 +1611,7 @@ static VkDescriptorSet* pvkAllocateDescriptorSets(VkDevice device, VkDescriptorP
 	return sets;
 }
 
-static VkDescriptorPool pvkCreateDescriptorPool(VkDevice device, u32 maxSets, u32 poolSize, ...)
+PVK_LINKAGE VkDescriptorPool pvkCreateDescriptorPool(VkDevice device, u32 maxSets, u32 poolSize, ...)
 {
 	va_list args;
 	va_start(args, poolSize);
@@ -1623,7 +1638,7 @@ static VkDescriptorPool pvkCreateDescriptorPool(VkDevice device, u32 maxSets, u3
 	return pool;
 }
 
-static void pvkWriteImageViewToDescriptor(VkDevice device, VkDescriptorSet set, uint32_t binding, VkImageView imageView, VkSampler sampler, VkImageLayout layout, VkDescriptorType descriptorType)
+PVK_LINKAGE void pvkWriteImageViewToDescriptor(VkDevice device, VkDescriptorSet set, uint32_t binding, VkImageView imageView, VkSampler sampler, VkImageLayout layout, VkDescriptorType descriptorType)
 {
 	VkDescriptorImageInfo imageInfo = 
 	{
@@ -1646,7 +1661,7 @@ static void pvkWriteImageViewToDescriptor(VkDevice device, VkDescriptorSet set, 
 	vkUpdateDescriptorSets(device, 1, &writeInfo, 0, NULL);
 }
 
-static void pvkWriteBufferToDescriptor(VkDevice device, VkDescriptorSet set, uint32_t binding, VkBuffer buffer, VkDescriptorType descriptorType)
+PVK_LINKAGE void pvkWriteBufferToDescriptor(VkDevice device, VkDescriptorSet set, uint32_t binding, VkBuffer buffer, VkDescriptorType descriptorType)
 {
 	VkDescriptorBufferInfo bufferInfo = 
 	{
@@ -1688,7 +1703,7 @@ typedef struct PvkGeometry
 	PvkMat4 transform;
 } PvkGeometry;
 
-static PvkGeometry* __pvkCreateGeometry(VkPhysicalDevice physicalDevice, VkDevice device, uint16_t queueFamilyIndexCount, uint32_t* queueFamilyIndices, PvkGeometryData* data)
+PVK_LINKAGE PvkGeometry* __pvkCreateGeometry(VkPhysicalDevice physicalDevice, VkDevice device, uint16_t queueFamilyIndexCount, uint32_t* queueFamilyIndices, PvkGeometryData* data)
 {
 	uint64_t vertexBufferSize = sizeof(PvkVertex) * data->vertexCount;
 	uint64_t indexBufferSize = sizeof(PvkIndex) * data->indexCount;
@@ -1708,7 +1723,7 @@ static PvkGeometry* __pvkCreateGeometry(VkPhysicalDevice physicalDevice, VkDevic
 	return geometry;
 }
 
-static PvkGeometry* pvkCreatePlaneGeometry(VkPhysicalDevice physicalDevice, VkDevice device, uint32_t queueFamilyIndexCount, uint32_t* queueFamilyIndices, float size)
+PVK_LINKAGE PvkGeometry* pvkCreatePlaneGeometry(VkPhysicalDevice physicalDevice, VkDevice device, uint32_t queueFamilyIndexCount, uint32_t* queueFamilyIndices, float size)
 {
 	PvkVertex vertices[4] = 
 	{
@@ -1728,7 +1743,7 @@ static PvkGeometry* pvkCreatePlaneGeometry(VkPhysicalDevice physicalDevice, VkDe
 	return __pvkCreateGeometry(physicalDevice, device, queueFamilyIndexCount, queueFamilyIndices, &geometryData);
 }
 
-static PvkGeometry* pvkCreateBoxGeometry(VkPhysicalDevice physicalDevice, VkDevice device, uint32_t queueFamilyIndexCount, uint32_t* queueFamilyIndices, float size)
+PVK_LINKAGE PvkGeometry* pvkCreateBoxGeometry(VkPhysicalDevice physicalDevice, VkDevice device, uint32_t queueFamilyIndexCount, uint32_t* queueFamilyIndices, float size)
 {
 	PvkVertex vertices[24] = 
 	{
@@ -1788,7 +1803,7 @@ static PvkGeometry* pvkCreateBoxGeometry(VkPhysicalDevice physicalDevice, VkDevi
 	return __pvkCreateGeometry(physicalDevice, device, queueFamilyIndexCount, queueFamilyIndices, &geometryData);
 }
 
-static void pvkDrawGeometry(VkCommandBuffer cb, PvkGeometry* geometry)
+PVK_LINKAGE void pvkDrawGeometry(VkCommandBuffer cb, PvkGeometry* geometry)
 {
 	VkDeviceSize offset = 0;
 	vkCmdBindVertexBuffers(cb, 0, 1, &geometry->vertexBuffer.handle, &offset);
@@ -1796,7 +1811,7 @@ static void pvkDrawGeometry(VkCommandBuffer cb, PvkGeometry* geometry)
 	vkCmdDrawIndexed(cb, geometry->indexCount, 1, 0, 0, 0);
 }
 
-static void pvkDestroyGeometry(VkDevice device, PvkGeometry* geometry)
+PVK_LINKAGE void pvkDestroyGeometry(VkDevice device, PvkGeometry* geometry)
 {
 	pvkDestroyBuffer(device, geometry->vertexBuffer);
 	pvkDestroyBuffer(device, geometry->indexBuffer);
@@ -1806,7 +1821,7 @@ static void pvkDestroyGeometry(VkDevice device, PvkGeometry* geometry)
 
 /* Camera */
 
-static PvkMat4 pvkMat4OrthoProj(float height, float aspectRatio, float n, float f)
+PVK_STATIC PVK_INLINE PVK_CONSTEXPR PvkMat4 pvkMat4OrthoProj(float height, float aspectRatio, float n, float f)
 {
 	return (PvkMat4)
 	{
@@ -1817,7 +1832,7 @@ static PvkMat4 pvkMat4OrthoProj(float height, float aspectRatio, float n, float 
 	};
 }
 
-static PvkMat4 pvkMat4PerspProj(float vAngle, float aspectRatio, float n, float f)
+PVK_LINKAGE PvkMat4 pvkMat4PerspProj(float vAngle, float aspectRatio, float n, float f)
 {
 	float height = tan(vAngle * 0.5f);
 	return (PvkMat4)
@@ -1849,10 +1864,10 @@ typedef enum PvkProjectionType
 	PVK_PROJECTION_TYPE_PERSPECTIVE
 } PvkProjectionType;
 
-static PvkCamera* pvkCreateCamera(float aspectRatio, PvkProjectionType projectionType, float heightOrAngle)
+PVK_LINKAGE PvkCamera* pvkCreateCamera(float aspectRatio, PvkProjectionType projectionType, float heightOrAngle)
 {
 	PvkCamera* cam = new(PvkCamera);
-	cam->transform = pvkMat4Mul(pvkMat4Translate((PvkVec3) { 0, 2.0f, 6.0f }), pvkMat4Rotate((PvkVec3) { -20 DEG, 0, 0 }));
+	cam->transform = pvkMat4Mul(pvkMat4Translate((PvkVec3) { 0, 2.0f, 6.0f }), pvkMat4Rotate((PvkVec3) { -20 PVK_DEG, 0, 0 }));
 	cam->view = pvkMat4Inverse(cam->transform);
 	switch(projectionType)
 	{
