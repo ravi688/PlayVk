@@ -23,7 +23,7 @@ BUILD_DEFINES=
 
 DEPENDENCIES = Common Common/dependencies/BufferLib Common/dependencies/BufferLib/dependencies/CallTrace
 DEPENDENCY_LIBS = Common/lib/common.a Common/dependencies/BufferLib/lib/bufferlib.a Common/dependencies/BufferLib/dependencies/CallTrace/lib/calltrace.a
-DEPENDENCIES_DIR = ./dependencies
+DEPENDENCIES_DIR = ..
 SHARED_DEPENDENCIES =
 SHARED_DEPENDENCY_LIBS =
 SHARED_DEPENDENCIES_DIR = ./shared-dependencies
@@ -292,7 +292,7 @@ bin-clean:
 	$(RM) $(TARGET_DYNAMIC_IMPORT_LIB)
 	$(RM_DIR) $(TARGET_LIB_DIR)
 	@echo [Log] Binaries cleaned successfully!
-	$(MAKE) --directory=./dependencies/Common clean
+	$(MAKE) --directory=../Common clean
 # 	$(MAKE) --directory=./shared-dependencies/CallTrace clean
 # 	$(MAKE) --directory=./dependencies/HPML clean
 # 	$(MAKE) --directory=../../shared-dependencies/HPML clean
