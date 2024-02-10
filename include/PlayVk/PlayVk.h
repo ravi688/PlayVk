@@ -17,10 +17,10 @@
 #define PVK_STATIC static
 #define PVK_LINKAGE extern
 #define PVK_INLINE inline
-// #define PVK_DEBUG
+#define PVK_DEBUG
 // #define PVK_IMPLEMENTATION
 
-#if defined(__cpluscplus) && (__cpluscplus >= 201103L)
+#if defined(__cplusplus) && (__cplusplus >= 201103L)
 #	define PVK_CONSTEXPR constexpr
 #else
 #	define PVK_CONSTEXPR const
@@ -38,6 +38,10 @@
 #define PVK_MALLOC(size) malloc(size)
 #define PVK_FREE(ptr) free(ptr)
 #define PVK_MEMSET(ptr, u8Value, count) memset(ptr, u8Value, count)
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #define new(type) (type*)__new(sizeof(type))
 #define newv(type, count) (type*)__new(sizeof(type) * count)
@@ -399,7 +403,7 @@ typedef struct PvkWindow
 } PvkWindow;
 
 
-#if PVK_DEBUG
+#ifdef PVK_DEBUG
 PVK_LINKAGE void glfwErrorCallback(int code, const char* description);
 #ifdef PVK_IMPLEMENTATION
 PVK_LINKAGE void glfwErrorCallback(int code, const char* description)
@@ -425,7 +429,7 @@ PVK_LINKAGE PvkWindow* pvkWindowCreate(uint32_t width, uint32_t height, const ch
 {
 	PvkWindow* window = new(PvkWindow);
 	glfwInit();
-#if PVK_DEBUG
+#ifdef PVK_DEBUG
 	glfwSetErrorCallback(glfwErrorCallback);
 #endif
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
@@ -441,7 +445,7 @@ PVK_LINKAGE PvkWindow* pvkWindowCreate(uint32_t width, uint32_t height, const ch
 
 PVK_STATIC PVK_INLINE bool pvkWindowShouldClose(PvkWindow* window)
 {
-	return glfwWindowShouldClose(window->handle);
+	return glfwWindowShouldClose((GLFWwindow*)window->handle);
 }
 
 PVK_STATIC PVK_INLINE void pvkWindowPollEvents(PvkWindow* window)
@@ -453,15 +457,15 @@ PVK_LINKAGE void pvkWindowDestroy(PvkWindow* window);
 #ifdef PVK_IMPLEMENTATION
 PVK_LINKAGE void pvkWindowDestroy(PvkWindow* window)
 {
-	glfwDestroyWindow(window->handle);
+	glfwDestroyWindow((GLFWwindow*)window->handle);
 	glfwTerminate();
 	delete(window);
 }
 #endif
 
-PVK_STATIC PVK_INLINE void pvkWindowGetFramebufferExtent(PvkWindow* window, uint32_t* out_width, uint32_t* out_height)
+PVK_STATIC PVK_INLINE void pvkWindowGetFramebufferExtent(PvkWindow* window, int* out_width, int* out_height)
 {
-	glfwGetFramebufferSize(window->handle, out_width, out_height);
+	glfwGetFramebufferSize((GLFWwindow*)window->handle, out_width, out_height);
 }
 
 PVK_LINKAGE VkSurfaceKHR pvkWindowCreateVulkanSurface(PvkWindow* window, VkInstance instance);
@@ -469,7 +473,7 @@ PVK_LINKAGE VkSurfaceKHR pvkWindowCreateVulkanSurface(PvkWindow* window, VkInsta
 PVK_LINKAGE VkSurfaceKHR pvkWindowCreateVulkanSurface(PvkWindow* window, VkInstance instance)
 {
 	VkSurfaceKHR surface;
-	PVK_CHECK(glfwCreateWindowSurface(instance, window->handle, NULL, &surface));
+	PVK_CHECK(glfwCreateWindowSurface(instance, (GLFWwindow*)window->handle, NULL, &surface));
 	return surface;
 }
 #endif
@@ -517,25 +521,25 @@ PVK_LINKAGE VkInstance __pvkCreateVulkanInstance(const char* appName, uint32_t a
 PVK_LINKAGE VkInstance __pvkCreateVulkanInstance(const char* appName, uint32_t appVersion, uint32_t apiVersion, PvkEnabledLayerAndExtensionInfo* enabledInfo)
 {
 	VkInstance instance;
-	VkApplicationInfo appInfo = 
+	VkApplicationInfo appInfo = { };
 	{
-		.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
-		.pApplicationName = appName,
-		.applicationVersion = appVersion,
-		.apiVersion = appVersion
+		appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
+		appInfo.pApplicationName = appName;
+		appInfo.applicationVersion = appVersion;
+		appInfo.apiVersion = appVersion;
 	};
 
 	if(enabledInfo->extensionCount != 0)
 		__pvkCheckForInstanceExtensionSupport(enabledInfo->extensionCount, enabledInfo->extensionNames);
 	
-	VkInstanceCreateInfo icInfo = 
+	VkInstanceCreateInfo icInfo = { };
 	{
-		.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
-		.pApplicationInfo = &appInfo,
-		.enabledLayerCount = enabledInfo->layerCount,
-		.ppEnabledLayerNames = enabledInfo->layerNames,
-		.enabledExtensionCount = enabledInfo->extensionCount,
-		.ppEnabledExtensionNames = enabledInfo->extensionNames
+		icInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+		icInfo.pApplicationInfo = &appInfo;
+		icInfo.enabledLayerCount = enabledInfo->layerCount;
+		icInfo.ppEnabledLayerNames = enabledInfo->layerNames;
+		icInfo.enabledExtensionCount = enabledInfo->extensionCount;
+		icInfo.ppEnabledExtensionNames = enabledInfo->extensionNames;
 	};
 	PVK_CHECK(vkCreateInstance(&icInfo, NULL, &instance));
 	return instance;
@@ -560,10 +564,10 @@ PVK_LINKAGE VkInstance pvkCreateVulkanInstanceWithExtensions(uint32_t count, ...
 
 	va_end(args);
 
-	PvkEnabledLayerAndExtensionInfo enabledInfo = 
+	PvkEnabledLayerAndExtensionInfo enabledInfo = { };
 	{
-		.extensionCount = extensionCount,
-		.extensionNames = extensions
+		enabledInfo.extensionCount = extensionCount;
+		enabledInfo.extensionNames = extensions;
 	};
 	return __pvkCreateVulkanInstance("Default Vulkan App", VK_MAKE_VERSION(1, 0, 0), VK_API_VERSION_1_0, &enabledInfo);
 }
@@ -680,10 +684,10 @@ PVK_LINKAGE bool __pvkIsPhysicalDeviceSuitable(VkPhysicalDevice device, VkSurfac
 	// isImageSupported &= (requirements->imageWidth >= capabilities.minImageExtent.width) && (requirements->imageWidth <= capabilities.maxImageExtent.width);
 	// isImageSupported &= (requirements->imageHeight >= capabilities.minImageExtent.height) && (requirements->imageHeight <= capabilities.maxImageExtent.height);
 
-	VkPhysicalDeviceFeatures requiredFeatures = 
+	VkPhysicalDeviceFeatures requiredFeatures = { };
 	{
-		.geometryShader = (requirements->shaders & PVK_SHADER_TYPE_GEOMETRY) ? VK_TRUE : VK_FALSE,
-		.tessellationShader = (requirements->shaders & PVK_SHADER_TYPE_TESSELLATION) ? VK_TRUE : VK_FALSE
+		requiredFeatures.geometryShader = (requirements->shaders & PVK_SHADER_TYPE_GEOMETRY) ? VK_TRUE : VK_FALSE;
+		requiredFeatures.tessellationShader = (requirements->shaders & PVK_SHADER_TYPE_TESSELLATION) ? VK_TRUE : VK_FALSE;
 	};
 
 	return isImageSupported 
@@ -716,14 +720,14 @@ PVK_LINKAGE VkPhysicalDevice pvkGetPhysicalDevice(VkInstance instance, VkSurface
 	char selectedGPUName[VK_MAX_PHYSICAL_DEVICE_NAME_SIZE];
 	for(int i = 0; i < deviceCount; i++)
 	{
-		PvkPhysicalDeviceRequirements requirements =
+		PvkPhysicalDeviceRequirements requirements = { };
 		{
-			.type = gpuType,
-			.format = format,
-			.colorSpace = colorSpace,
-			.presentMode = presentMode,
-			.shaders = PVK_SHADER_TYPE_GEOMETRY | PVK_SHADER_TYPE_TESSELLATION,
-			.imageCount = 3,
+			requirements.type = gpuType;
+			requirements.format = format;
+			requirements.colorSpace = colorSpace;
+			requirements.presentMode = presentMode;
+			requirements.shaders = (PvkShaderFlags)(PVK_SHADER_TYPE_GEOMETRY | PVK_SHADER_TYPE_TESSELLATION);
+			requirements.imageCount = 3;
 			// .imageWidth = 800,
 			// .imageHeight = 800
 		};
@@ -811,7 +815,8 @@ PVK_LINKAGE void __pvkUnionUInt32(uint32_t count, const uint32_t* values, uint32
 
 	// look up table
 	PVK_ASSERT(sizeof(bool) == 1);
-	bool exists[maxValue + 1]; memset(exists, false, maxValue + 1);
+	bool exists[maxValue + 1]; 
+	PVK_MEMSET(exists, false, maxValue + 1);
 
 	for(int i = 0; i < count; i++)
 	{
@@ -886,14 +891,14 @@ PVK_LINKAGE VkDevice pvkCreateLogicalDeviceWithExtensions(VkInstance instance, V
 	// TODO: make features configurable
 	VkPhysicalDeviceFeatures features = { };
 
-	VkDeviceCreateInfo dcInfo = 
+	VkDeviceCreateInfo dcInfo = { };
 	{
-		.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-		.queueCreateInfoCount = uniqueQueueFamilyCount,
-		.pQueueCreateInfos = queueCreateInfos,
-		.enabledExtensionCount = extensionCount,
-		.ppEnabledExtensionNames = extensions,
-		.pEnabledFeatures = &features
+		dcInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+		dcInfo.queueCreateInfoCount = uniqueQueueFamilyCount;
+		dcInfo.pQueueCreateInfos = queueCreateInfos;
+		dcInfo.enabledExtensionCount = extensionCount;
+		dcInfo.ppEnabledExtensionNames = extensions;
+		dcInfo.pEnabledFeatures = &features;
 	};
 	VkDevice device;
 	PVK_CHECK(vkCreateDevice(physicalDevice, &dcInfo, NULL, &device));
@@ -917,24 +922,24 @@ PVK_LINKAGE VkSwapchainKHR pvkCreateSwapchain(VkDevice device, VkSurfaceKHR surf
 	uint32_t uniqueQueueFamilyIndices[queueFamilyCount];
 	__pvkUnionUInt32(queueFamilyCount, queueFamilyIndices, &uniqueQueueFamilyCount, uniqueQueueFamilyIndices);
 
-	VkSwapchainCreateInfoKHR scInfo = 
+	VkSwapchainCreateInfoKHR scInfo = { };
 	{
-		.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
-		.surface = surface,
-		.minImageCount = 3,
-		.imageFormat = format,
-		.imageColorSpace = colorSpace,
-		.imageExtent = { width, height },
-		.imageArrayLayers = 1,
-		.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
-		.imageSharingMode = (uniqueQueueFamilyCount > 1) ? VK_SHARING_MODE_CONCURRENT : VK_SHARING_MODE_EXCLUSIVE,
-		.queueFamilyIndexCount = uniqueQueueFamilyCount,
-		.pQueueFamilyIndices = uniqueQueueFamilyIndices,
-		.preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR,
-		.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
-		.presentMode = presentMode,
-		.clipped = VK_TRUE,
-		.oldSwapchain = oldSwapchain
+		scInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+		scInfo.surface = surface;
+		scInfo.minImageCount = 3;
+		scInfo.imageFormat = format;
+		scInfo.imageColorSpace = colorSpace;
+		scInfo.imageExtent = (VkExtent2D) { width, height };
+		scInfo.imageArrayLayers = 1;
+		scInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+		scInfo.imageSharingMode = (uniqueQueueFamilyCount > 1) ? VK_SHARING_MODE_CONCURRENT : VK_SHARING_MODE_EXCLUSIVE;
+		scInfo.queueFamilyIndexCount = uniqueQueueFamilyCount;
+		scInfo.pQueueFamilyIndices = uniqueQueueFamilyIndices;
+		scInfo.preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
+		scInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+		scInfo.presentMode = presentMode;
+		scInfo.clipped = VK_TRUE;
+		scInfo.oldSwapchain = oldSwapchain;
 	};
 
 	VkSwapchainKHR swapchain;
@@ -947,11 +952,11 @@ PVK_LINKAGE VkCommandPool pvkCreateCommandPool(VkDevice device, VkCommandPoolCre
 #ifdef PVK_IMPLEMENTATION
 PVK_LINKAGE VkCommandPool pvkCreateCommandPool(VkDevice device, VkCommandPoolCreateFlags flags, uint32_t queueFamilyIndex)
 {
-	VkCommandPoolCreateInfo cInfo = 
+	VkCommandPoolCreateInfo cInfo = { };
 	{
-		.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
-		.flags = flags,
-		.queueFamilyIndex = queueFamilyIndex
+		cInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+		cInfo.flags = flags;
+		cInfo.queueFamilyIndex = queueFamilyIndex;
 	};
 	VkCommandPool commandPool;
 	PVK_CHECK(vkCreateCommandPool(device, &cInfo, NULL, &commandPool));
@@ -963,12 +968,12 @@ PVK_LINKAGE VkCommandBuffer* __pvkAllocateCommandBuffers(VkDevice device, VkComm
 #ifdef PVK_IMPLEMENTATION
 PVK_LINKAGE VkCommandBuffer* __pvkAllocateCommandBuffers(VkDevice device, VkCommandPool pool, VkCommandBufferLevel level, uint32_t count)
 {
-	VkCommandBufferAllocateInfo info = 
+	VkCommandBufferAllocateInfo info = { };
 	{
-		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-		.commandPool = pool,
-		.level = level,
-		.commandBufferCount = count
+		info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+		info.commandPool = pool;
+		info.level = level;
+		info.commandBufferCount = count;
 	};
 
 	VkCommandBuffer* commandBuffers = newv(VkCommandBuffer, count);
@@ -986,7 +991,8 @@ PVK_LINKAGE VkSemaphore pvkCreateSemaphore(VkDevice device);
 #ifdef PVK_IMPLEMENTATION
 PVK_LINKAGE VkSemaphore pvkCreateSemaphore(VkDevice device)
 {
-	VkSemaphoreCreateInfo cInfo = { .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
+	VkSemaphoreCreateInfo cInfo = { };
+	{ cInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO; };
 	VkSemaphore semaphore;
 	PVK_CHECK(vkCreateSemaphore(device, &cInfo, NULL, &semaphore));
 	return semaphore;
@@ -997,7 +1003,8 @@ PVK_LINKAGE VkFence pvkCreateFence(VkDevice device, VkFenceCreateFlags flags);
 #ifdef PVK_IMPLEMENTATION
 PVK_LINKAGE VkFence pvkCreateFence(VkDevice device, VkFenceCreateFlags flags)
 {
-	VkFenceCreateInfo cInfo = { .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, .flags = flags };
+	VkFenceCreateInfo cInfo = { };
+	{ cInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO; cInfo.flags = flags; };
 	VkFence fence;
 	PVK_CHECK(vkCreateFence(device, &cInfo, NULL, &fence));
 	return fence;
@@ -1015,7 +1022,7 @@ PVK_LINKAGE PvkSemaphoreCircularPool* pvkCreateSemaphoreCircularPool(VkDevice de
 #ifdef PVK_IMPLEMENTATION
 PVK_LINKAGE PvkSemaphoreCircularPool* pvkCreateSemaphoreCircularPool(VkDevice device, uint32_t reserveCount)
 {
-	PvkSemaphoreCircularPool* pool = (PvkSemaphoreCircularPool*)malloc(sizeof(PvkSemaphoreCircularPool));
+	PvkSemaphoreCircularPool* pool = (PvkSemaphoreCircularPool*)PVK_MALLOC(sizeof(PvkSemaphoreCircularPool));
 	pool->semaphores = (VkSemaphore*)PVK_MALLOC(sizeof(VkSemaphore) * reserveCount);
 	pool->reserveCount = reserveCount;
 	pool->acquiredIndex = 0;
@@ -1124,16 +1131,16 @@ PVK_LINKAGE void pvkSubmit(VkCommandBuffer commandBuffer, VkQueue queue, VkSemap
 PVK_LINKAGE void pvkSubmit(VkCommandBuffer commandBuffer, VkQueue queue, VkSemaphore wait, VkSemaphore signal, VkFence signalFence)
 {
 	VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-	VkSubmitInfo info =
+	VkSubmitInfo info = { };
 	{
-		.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-		.waitSemaphoreCount = 1,
-		.pWaitSemaphores = &wait,
-		.pWaitDstStageMask = &waitStage,
-		.signalSemaphoreCount = 1,
-		.pSignalSemaphores = &signal,
-		.commandBufferCount = 1,
-		.pCommandBuffers = &commandBuffer
+		info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+		info.waitSemaphoreCount = 1;
+		info.pWaitSemaphores = &wait;
+		info.pWaitDstStageMask = &waitStage;
+		info.signalSemaphoreCount = 1;
+		info.pSignalSemaphores = &signal;
+		info.commandBufferCount = 1;
+		info.pCommandBuffers = &commandBuffer;
 	};
 	PVK_CHECK(vkQueueSubmit(queue, 1, &info, signalFence));
 }
@@ -1158,15 +1165,15 @@ PVK_LINKAGE bool pvkPresent(uint32_t index, VkSwapchainKHR  swapchain, VkQueue q
 PVK_LINKAGE bool pvkPresent(uint32_t index, VkSwapchainKHR  swapchain, VkQueue queue, VkSemaphore wait)
 {
 	VkResult result;
-	VkPresentInfoKHR info = 
+	VkPresentInfoKHR info = { };
 	{
-		.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
-		.waitSemaphoreCount = 1,
-		.pWaitSemaphores = &wait,
-		.swapchainCount = 1,
-		.pSwapchains = &swapchain,
-		.pImageIndices = &index,
-		.pResults = &result
+		info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+		info.waitSemaphoreCount = 1;
+		info.pWaitSemaphores = &wait;
+		info.swapchainCount = 1;
+		info.pSwapchains = &swapchain;
+		info.pImageIndices = &index;
+		info.pResults = &result;
 	};
 	// PVK_ASSERT(result == VK_SUCCESS);
 	result = vkQueuePresentKHR(queue, &info);
@@ -1183,7 +1190,8 @@ PVK_LINKAGE void pvkBeginCommandBuffer(VkCommandBuffer commandBuffer, VkCommandB
 PVK_LINKAGE void pvkBeginCommandBuffer(VkCommandBuffer commandBuffer, VkCommandBufferUsageFlagBits usageFlagBits)
 {
 	PVK_CHECK(vkResetCommandBuffer(commandBuffer, 0));
-	VkCommandBufferBeginInfo beginInfo = { .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO, .flags = usageFlagBits };
+	VkCommandBufferBeginInfo beginInfo = { };
+	{ beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO; beginInfo.flags = usageFlagBits; };
 	PVK_CHECK(vkBeginCommandBuffer(commandBuffer, &beginInfo));
 }
 #endif
@@ -1197,14 +1205,15 @@ PVK_LINKAGE void pvkBeginRenderPass(VkCommandBuffer commandBuffer, VkRenderPass 
 #ifdef PVK_IMPLEMENTATION
 PVK_LINKAGE void pvkBeginRenderPass(VkCommandBuffer commandBuffer, VkRenderPass renderPass, VkFramebuffer framebuffer, uint32_t width, uint32_t height, uint32_t clearValueCount, VkClearValue* clearValues)
 {
-	VkRenderPassBeginInfo beginInfo = 
+	VkRenderPassBeginInfo beginInfo = { };
 	{
-		.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
-		.renderPass = renderPass,
-		.framebuffer = framebuffer,
-		.renderArea = { .offset = { 0, 0 }, .extent = { width, height } },
-		.clearValueCount = clearValueCount,
-		.pClearValues = clearValues
+		beginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+		beginInfo.renderPass = renderPass;
+		beginInfo.framebuffer = framebuffer;
+		beginInfo.renderArea = (VkRect2D) { };
+		{ beginInfo.renderArea.offset = (VkOffset2D) { 0, 0 }; beginInfo.renderArea.extent = (VkExtent2D) { width, height }; };
+		beginInfo.clearValueCount = clearValueCount;
+		beginInfo.pClearValues = clearValues;
 	};
 	vkCmdBeginRenderPass(commandBuffer, &beginInfo, VK_SUBPASS_CONTENTS_INLINE);
 }
@@ -1219,38 +1228,38 @@ PVK_LINKAGE VkRenderPass pvkCreateRenderPass(VkDevice device);
 #ifdef PVK_IMPLEMENTATION
 PVK_LINKAGE VkRenderPass pvkCreateRenderPass(VkDevice device)
 {
-	VkAttachmentDescription colorAttachmentDescription = 
+	VkAttachmentDescription colorAttachmentDescription = { };
 	{
-		.format = VK_FORMAT_B8G8R8A8_SRGB,
-		.samples = VK_SAMPLE_COUNT_1_BIT,
-	 	.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
-	 	.storeOp = VK_ATTACHMENT_STORE_OP_STORE,
-	 	.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-	 	.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-	 	.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-	 	.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
+		colorAttachmentDescription.format = VK_FORMAT_B8G8R8A8_SRGB;
+		colorAttachmentDescription.samples = VK_SAMPLE_COUNT_1_BIT;
+	 	colorAttachmentDescription.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+	 	colorAttachmentDescription.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+	 	colorAttachmentDescription.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+	 	colorAttachmentDescription.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	 	colorAttachmentDescription.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	 	colorAttachmentDescription.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 	};
 
-	VkAttachmentReference colorAttachmentReference = 
+	VkAttachmentReference colorAttachmentReference = { };
 	{
-		.attachment = 0,
-		.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+		colorAttachmentReference.attachment = 0;
+		colorAttachmentReference.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 	};
 
-	VkSubpassDescription subpass = 
+	VkSubpassDescription subpass = { };
 	{
-		.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
-		.colorAttachmentCount = 1,
-		.pColorAttachments = &colorAttachmentReference,
+		subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+		subpass.colorAttachmentCount = 1;
+		subpass.pColorAttachments = &colorAttachmentReference;
 	};
 
-	VkRenderPassCreateInfo rInfo = 
+	VkRenderPassCreateInfo rInfo = { };
 	{
-		.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
-		.attachmentCount = 1, 
-		.pAttachments = &colorAttachmentDescription,
-		.subpassCount = 1,
-		.pSubpasses = &subpass
+		rInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+		rInfo.attachmentCount = 1;
+		rInfo.pAttachments = &colorAttachmentDescription;
+		rInfo.subpassCount = 1;
+		rInfo.pSubpasses = &subpass;
 	};
 	VkRenderPass renderPass;
 	PVK_CHECK(vkCreateRenderPass(device, &rInfo, NULL, &renderPass));
@@ -1263,11 +1272,11 @@ PVK_LINKAGE VkDeviceMemory pvkAllocateMemory(VkDevice device, VkDeviceSize size,
 #ifdef PVK_IMPLEMENTATION
 PVK_LINKAGE VkDeviceMemory pvkAllocateMemory(VkDevice device, VkDeviceSize size, uint32_t memoryTypeIndex)
 {
-	VkMemoryAllocateInfo aInfo = 
+	VkMemoryAllocateInfo aInfo = { };
 	{
-		.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
-		.allocationSize = size,
-		.memoryTypeIndex = memoryTypeIndex
+		aInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+		aInfo.allocationSize = size;
+		aInfo.memoryTypeIndex = memoryTypeIndex;
 	};
 
 	VkDeviceMemory memory;
@@ -1312,20 +1321,21 @@ PVK_LINKAGE VkImage __pvkCreateImage(VkDevice device, VkFormat format, uint32_t 
 	uint32_t uniqueQueueFamilyIndices[queueFamilyIndexCount];
 	__pvkUnionUInt32(queueFamilyIndexCount, queueFamilyIndices, &uniqueQueueFamilyCount, uniqueQueueFamilyIndices);
 	
-	VkImageCreateInfo cInfo = 
+	VkImageCreateInfo cInfo = { };
 	{
-		.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
-		.imageType = VK_IMAGE_TYPE_2D,
-		.format = format,
-		.extent = { .width = width, .height = height, .depth = 1 },
-		.mipLevels = 1,
-		.arrayLayers = 1,
-		.samples = VK_SAMPLE_COUNT_1_BIT,
-		.tiling = VK_IMAGE_TILING_OPTIMAL,
-		.usage = usageFlags,
-		.sharingMode = (uniqueQueueFamilyCount > 1) ? VK_SHARING_MODE_CONCURRENT : VK_SHARING_MODE_EXCLUSIVE,
-		.queueFamilyIndexCount = uniqueQueueFamilyCount,
-		.pQueueFamilyIndices = uniqueQueueFamilyIndices
+		cInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+		cInfo.imageType = VK_IMAGE_TYPE_2D;
+		cInfo.format = format;
+		cInfo.extent = (VkExtent3D) { };
+		{ cInfo.extent.width = width; cInfo.extent.height = height; cInfo.extent.depth = 1; };
+		cInfo.mipLevels = 1;
+		cInfo.arrayLayers = 1;
+		cInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+		cInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+		cInfo.usage = usageFlags;
+		cInfo.sharingMode = (uniqueQueueFamilyCount > 1) ? VK_SHARING_MODE_CONCURRENT : VK_SHARING_MODE_EXCLUSIVE;
+		cInfo.queueFamilyIndexCount = uniqueQueueFamilyCount;
+		cInfo.pQueueFamilyIndices = uniqueQueueFamilyIndices;
 	};
 	VkImage image;
 	PVK_CHECK(vkCreateImage(device, &cInfo, NULL, &image));
@@ -1366,18 +1376,18 @@ PVK_LINKAGE VkImageView pvkCreateImageView(VkDevice device, VkImage image, VkFor
 #ifdef PVK_IMPLEMENTATION
 PVK_LINKAGE VkImageView pvkCreateImageView(VkDevice device, VkImage image, VkFormat format, VkImageAspectFlagBits aspectMask)
 {
-	VkImageViewCreateInfo cInfo = 
+	VkImageViewCreateInfo cInfo = { };
 	{
-		.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-		.image = image,
-		.viewType = VK_IMAGE_VIEW_TYPE_2D,
-		.format = format,
-		.components = { VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY },
-		.subresourceRange = 
+		cInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+		cInfo.image = image;
+		cInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+		cInfo.format = format;
+		cInfo.components = (VkComponentMapping) { VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY };
+		cInfo.subresourceRange = (VkImageSubresourceRange) { };
 		{
-			.aspectMask = aspectMask,
-			.levelCount = 1,
-			.layerCount = 1
+			cInfo.subresourceRange.aspectMask = aspectMask;
+			cInfo.subresourceRange.levelCount = 1;
+			cInfo.subresourceRange.layerCount = 1;
 		}
 	};
 	VkImageView imageView;
@@ -1426,15 +1436,15 @@ PVK_LINKAGE VkFramebuffer* pvkCreateFramebuffers(VkDevice device, VkRenderPass r
 	VkFramebuffer* framebuffers = newv(VkFramebuffer, fbCount);
 	for(int i = 0; i < fbCount; i++)
 	{
-		VkFramebufferCreateInfo fInfo = 
+		VkFramebufferCreateInfo fInfo = { };
 		{
-			.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
-			.renderPass = renderPass,
-			.attachmentCount = attachmentCount,
-			.pAttachments = &imageViews[attachmentCount * i],
-			.width = width,
-			.height = height,
-			.layers = 1
+			fInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+			fInfo.renderPass = renderPass;
+			fInfo.attachmentCount = attachmentCount;
+			fInfo.pAttachments = &imageViews[attachmentCount * i];
+			fInfo.width = width;
+			fInfo.height = height;
+			fInfo.layers = 1;
 		};
 		PVK_CHECK(vkCreateFramebuffer(device, &fInfo, NULL, &framebuffers[i]));
 	}
@@ -1482,11 +1492,11 @@ PVK_LINKAGE VkShaderModule pvkCreateShaderModule(VkDevice device, const char* fi
 	size_t length;
 	const char* bytes = __pvkLoadBinaryFile(filePath, &length);
 	PVK_ASSERT((length % 4) == 0);
-	VkShaderModuleCreateInfo cInfo = 
+	VkShaderModuleCreateInfo cInfo = { };
 	{
-		.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-		.codeSize = (uint32_t)length,
-		.pCode = (uint32_t*)bytes,
+		cInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+		cInfo.codeSize = (uint32_t)length;
+		cInfo.pCode = (uint32_t*)bytes;
 	};
 	VkShaderModule shaderModule;
 	PVK_CHECK(vkCreateShaderModule(device, &cInfo, NULL, &shaderModule));
@@ -1505,15 +1515,15 @@ PVK_LINKAGE VkShaderStageFlagBits __pkvShaderTypeToVulkanShaderStage(PvkShaderTy
 #ifdef PVK_IMPLEMENTATION
 PVK_LINKAGE VkShaderStageFlagBits __pkvShaderTypeToVulkanShaderStage(PvkShaderType type)
 {
-	VkShaderStageFlagBits flags = 0;
+	VkShaderStageFlagBits flags = (VkShaderStageFlagBits)0;
 	if(type & PVK_SHADER_TYPE_VERTEX)
-		flags |= VK_SHADER_STAGE_VERTEX_BIT;
+		flags = (VkShaderStageFlagBits) (flags | VK_SHADER_STAGE_VERTEX_BIT);
 	if(type & PVK_SHADER_TYPE_TESSELLATION)
-		flags |= VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT;
+		flags = (VkShaderStageFlagBits) (flags | VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT);
 	if(type & PVK_SHADER_TYPE_GEOMETRY)
-		flags |= VK_SHADER_STAGE_GEOMETRY_BIT;
+		flags = (VkShaderStageFlagBits) (flags | VK_SHADER_STAGE_GEOMETRY_BIT);
 	if(type & PVK_SHADER_TYPE_FRAGMENT)
-		flags |= VK_SHADER_STAGE_FRAGMENT_BIT;
+		flags = (VkShaderStageFlagBits) (flags | VK_SHADER_STAGE_FRAGMENT_BIT);
 	return flags;
 }
 #endif
@@ -1525,12 +1535,12 @@ PVK_LINKAGE VkPipelineShaderStageCreateInfo* __pvkCreatePipelineShaderStageCreat
 	VkPipelineShaderStageCreateInfo* infos = newv(VkPipelineShaderStageCreateInfo, count);
 	for(int i = 0; i < count; i++)
 	{
-		infos[i] = (VkPipelineShaderStageCreateInfo)
+		infos[i] = (VkPipelineShaderStageCreateInfo) { };
 		{
-			.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-			.module = shaders[i].handle,
-			.pName = "main",
-			.stage = __pkvShaderTypeToVulkanShaderStage(shaders[i].type)	
+			infos[i].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+			infos[i].module = shaders[i].handle;
+			infos[i].pName = "main";
+			infos[i].stage = __pkvShaderTypeToVulkanShaderStage(shaders[i].type);	
 		};
 	}
 	return infos;
@@ -1562,13 +1572,14 @@ typedef struct PvkVertex
 
 PVK_STATIC PVK_INLINE PVK_CONSTEXPR VkVertexInputAttributeDescription __pvkGetVertexInputAttributeDescription(uint32_t binding, uint32_t location, VkFormat format, uint32_t offset)
 {
-	return (VkVertexInputAttributeDescription)
+	VkVertexInputAttributeDescription dsc = { };
 	{
-		.location = location,
-		.binding = binding,
-		.format = format,
-		.offset = offset
+		dsc.location = location;
+		dsc.binding = binding;
+		dsc.format = format;
+		dsc.offset = offset;
 	};
+	return dsc;
 }
 
 PVK_LINKAGE VkPipeline __pvkCreateGraphicsPipeline(VkDevice device, VkPipelineLayout layout, VkRenderPass renderPass, uint32_t subpassIndex, uint32_t width, uint32_t height, VkPipelineColorBlendStateCreateInfo* colorBlend, bool enableDepth, uint32_t count, va_list args);
@@ -1582,11 +1593,11 @@ PVK_LINKAGE VkPipeline __pvkCreateGraphicsPipeline(VkDevice device, VkPipelineLa
 	VkPipelineShaderStageCreateInfo* stageCInfos = __pvkCreatePipelineShaderStageCreateInfos(count, shaderModules);
 
 	/* Vertex buffer layouts and their description */
-	VkVertexInputBindingDescription vertexBindingDescription = 
+	VkVertexInputBindingDescription vertexBindingDescription = { };
 	{
-		.binding = 0,
-		.stride = PVK_VERTEX_SIZE,
-		.inputRate = VK_VERTEX_INPUT_RATE_VERTEX
+		vertexBindingDescription.binding = 0;
+		vertexBindingDescription.stride = PVK_VERTEX_SIZE;
+		vertexBindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 	};
 	VkVertexInputAttributeDescription* vertexAttributeDescriptions = newv(VkVertexInputAttributeDescription, PVK_VERTEX_ATTRIBUTE_COUNT);
 	vertexAttributeDescriptions[0] = __pvkGetVertexInputAttributeDescription(0, 0, VK_FORMAT_R32G32B32_SFLOAT, PVK_VERTEX_POSITION_OFFSET);
@@ -1594,94 +1605,94 @@ PVK_LINKAGE VkPipeline __pvkCreateGraphicsPipeline(VkDevice device, VkPipelineLa
 	vertexAttributeDescriptions[2] = __pvkGetVertexInputAttributeDescription(0, 2, VK_FORMAT_R32G32_SFLOAT, PVK_VERTEX_TEXCOORD_OFFSET);
 	vertexAttributeDescriptions[3] = __pvkGetVertexInputAttributeDescription(0, 3, VK_FORMAT_R32G32B32A32_SFLOAT, PVK_VERTEX_COLOR_OFFSET);
 
-	VkPipelineVertexInputStateCreateInfo vertexInputStateCInfo = 
+	VkPipelineVertexInputStateCreateInfo vertexInputStateCInfo = { };
 	{
-		.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
-		.vertexBindingDescriptionCount = 1,
-		.pVertexBindingDescriptions = &vertexBindingDescription,
-		.vertexAttributeDescriptionCount = PVK_VERTEX_ATTRIBUTE_COUNT,
-		.pVertexAttributeDescriptions = vertexAttributeDescriptions
+		vertexInputStateCInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+		vertexInputStateCInfo.vertexBindingDescriptionCount = 1;
+		vertexInputStateCInfo.pVertexBindingDescriptions = &vertexBindingDescription;
+		vertexInputStateCInfo.vertexAttributeDescriptionCount = PVK_VERTEX_ATTRIBUTE_COUNT;
+		vertexInputStateCInfo.pVertexAttributeDescriptions = vertexAttributeDescriptions;
 	};
 
 	/* Primitive assembly */
-	VkPipelineInputAssemblyStateCreateInfo inputAssemblyStateCInfo = 
+	VkPipelineInputAssemblyStateCreateInfo inputAssemblyStateCInfo = { };
 	{
-		.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
-		.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
-		.primitiveRestartEnable = VK_FALSE
+		inputAssemblyStateCInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+		inputAssemblyStateCInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+		inputAssemblyStateCInfo.primitiveRestartEnable = VK_FALSE;
 	};
 
 	/* Viewport configuration */
-	VkViewport viewport = 
+	VkViewport viewport = { };
 	{
-		.x = 0,
-		.y = 0,
-		.width = width,
-		.height = height,
-		.minDepth = 0,
-		.maxDepth = 1.0f
+		viewport.x = 0;
+		viewport.y = 0;
+		viewport.width = width;
+		viewport.height = height;
+		viewport.minDepth = 0;
+		viewport.maxDepth = 1.0f;
 	};
-	VkRect2D scissor = 
+	VkRect2D scissor = { };
 	{
-		.offset = { 0, 0 },
-		.extent = { width, height }
+		scissor.offset = (VkOffset2D) { 0, 0 };
+		scissor.extent = (VkExtent2D) { width, height };
 	};
 
-	VkPipelineViewportStateCreateInfo viewportStateCInfo = 
+	VkPipelineViewportStateCreateInfo viewportStateCInfo = { };
 	{
-		.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
-		.viewportCount = 1,
-		.pViewports = &viewport,
-		.scissorCount = 1,
-		.pScissors = &scissor
+		viewportStateCInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+		viewportStateCInfo.viewportCount = 1;
+		viewportStateCInfo.pViewports = &viewport;
+		viewportStateCInfo.scissorCount = 1;
+		viewportStateCInfo.pScissors = &scissor;
 	};
 
 	/* Rasterization configuration */
-	VkPipelineRasterizationStateCreateInfo rasterizationStateCInfo = 
+	VkPipelineRasterizationStateCreateInfo rasterizationStateCInfo = { };
 	{
-		.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
-		.depthClampEnable = VK_FALSE,
-		.rasterizerDiscardEnable = VK_FALSE,
-		.polygonMode = VK_POLYGON_MODE_FILL,
-		.cullMode = VK_CULL_MODE_BACK_BIT,
-		.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
-		.lineWidth = 1.0f
+		rasterizationStateCInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+		rasterizationStateCInfo.depthClampEnable = VK_FALSE;
+		rasterizationStateCInfo.rasterizerDiscardEnable = VK_FALSE;
+		rasterizationStateCInfo.polygonMode = VK_POLYGON_MODE_FILL;
+		rasterizationStateCInfo.cullMode = VK_CULL_MODE_BACK_BIT;
+		rasterizationStateCInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+		rasterizationStateCInfo.lineWidth = 1.0f;
 	};
 
 	/* Multisampling */
-	VkPipelineMultisampleStateCreateInfo multisamplingStateCInfo = 
+	VkPipelineMultisampleStateCreateInfo multisamplingStateCInfo = { };
 	{
-		.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
-		.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT,
-		.sampleShadingEnable = VK_FALSE
+		multisamplingStateCInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+		multisamplingStateCInfo.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+		multisamplingStateCInfo.sampleShadingEnable = VK_FALSE;
 	};
 
 	/* Depth stencil configuration */
-	VkPipelineDepthStencilStateCreateInfo dephtStencilStateCInfo = 
+	VkPipelineDepthStencilStateCreateInfo dephtStencilStateCInfo = { };
 	{
-		.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
-		.depthTestEnable = enableDepth ? VK_TRUE : VK_FALSE,
-		.depthWriteEnable = enableDepth ? VK_TRUE : VK_FALSE,
-		.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL,
-		.stencilTestEnable = VK_FALSE,
-		.depthBoundsTestEnable = VK_FALSE
+		dephtStencilStateCInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+		dephtStencilStateCInfo.depthTestEnable = enableDepth ? VK_TRUE : VK_FALSE;
+		dephtStencilStateCInfo.depthWriteEnable = enableDepth ? VK_TRUE : VK_FALSE;
+		dephtStencilStateCInfo.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
+		dephtStencilStateCInfo.stencilTestEnable = VK_FALSE;
+		dephtStencilStateCInfo.depthBoundsTestEnable = VK_FALSE;
 	};
 
-	VkGraphicsPipelineCreateInfo pipelineCInfo = 
+	VkGraphicsPipelineCreateInfo pipelineCInfo = { };
 	{
-		.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
-		.stageCount = count,
-		.pStages = stageCInfos,
-		.pVertexInputState = &vertexInputStateCInfo,
-		.pInputAssemblyState = &inputAssemblyStateCInfo,
-		.pViewportState = &viewportStateCInfo,
-		.pMultisampleState = &multisamplingStateCInfo,
-		.pRasterizationState = &rasterizationStateCInfo,
-		.pDepthStencilState = &dephtStencilStateCInfo,
-		.pColorBlendState = colorBlend,
-		.layout = layout,
-		.renderPass = renderPass,
-		.subpass = subpassIndex
+		pipelineCInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+		pipelineCInfo.stageCount = count;
+		pipelineCInfo.pStages = stageCInfos;
+		pipelineCInfo.pVertexInputState = &vertexInputStateCInfo;
+		pipelineCInfo.pInputAssemblyState = &inputAssemblyStateCInfo;
+		pipelineCInfo.pViewportState = &viewportStateCInfo;
+		pipelineCInfo.pMultisampleState = &multisamplingStateCInfo;
+		pipelineCInfo.pRasterizationState = &rasterizationStateCInfo;
+		pipelineCInfo.pDepthStencilState = &dephtStencilStateCInfo;
+		pipelineCInfo.pColorBlendState = colorBlend;
+		pipelineCInfo.layout = layout;
+		pipelineCInfo.renderPass = renderPass;
+		pipelineCInfo.subpass = subpassIndex;
 	};
 
 	VkPipeline pipeline;
@@ -1716,20 +1727,20 @@ PVK_LINKAGE VkPipeline pvkCreateGraphicsPipeline(VkDevice device, VkPipelineLayo
 	VkPipelineColorBlendAttachmentState* colorAttachments = newv(VkPipelineColorBlendAttachmentState, colorAttachmentCount);
 	for(uint32_t i = 0; i < colorAttachmentCount; i++)
 	{
-		VkPipelineColorBlendAttachmentState colorAttachment = 
+		VkPipelineColorBlendAttachmentState colorAttachment = { };
 		{
-			.blendEnable = VK_FALSE,
-			.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT	
+			colorAttachment.blendEnable = VK_FALSE;
+			colorAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
 		};
 		colorAttachments[i] = colorAttachment;
 	}
 
-	VkPipelineColorBlendStateCreateInfo colorBlend = 
+	VkPipelineColorBlendStateCreateInfo colorBlend = { };
 	{
-		.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
-		.logicOpEnable = VK_FALSE,
-		.attachmentCount = colorAttachmentCount,
-		.pAttachments = colorAttachments
+		colorBlend.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+		colorBlend.logicOpEnable = VK_FALSE;
+		colorBlend.attachmentCount = colorAttachmentCount;
+		colorBlend.pAttachments = colorAttachments;
 	};
 
 	VkPipeline pipeline =  __pvkCreateGraphicsPipeline(device, layout, renderPass, subpassIndex, width, height, &colorBlend, true, count, shaderModuleList);
@@ -1743,11 +1754,11 @@ PVK_LINKAGE VkPipelineLayout pvkCreatePipelineLayout(VkDevice device, uint32_t s
 #ifdef PVK_IMPLEMENTATION
 PVK_LINKAGE VkPipelineLayout pvkCreatePipelineLayout(VkDevice device, uint32_t setLayoutCount, VkDescriptorSetLayout* setLayouts)
 {
-	VkPipelineLayoutCreateInfo cInfo = 
+	VkPipelineLayoutCreateInfo cInfo = { };
 	{
-		.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-		.setLayoutCount = setLayoutCount,
-		.pSetLayouts = setLayouts
+		cInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+		cInfo.setLayoutCount = setLayoutCount;
+		cInfo.pSetLayouts = setLayouts;
 	};
 	VkPipelineLayout layout;
 	PVK_CHECK(vkCreatePipelineLayout(device, &cInfo, NULL, &layout));
@@ -1765,14 +1776,14 @@ PVK_LINKAGE VkBuffer __pvkCreateBuffer(VkDevice device, VkBufferUsageFlags usage
 	uint32_t uniqueQueueFamilyIndices[queueFamilyCount];
 	__pvkUnionUInt32(queueFamilyCount, queueFamilyIndices, &uniqueQueueFamilyCount, uniqueQueueFamilyIndices);
 
-	VkBufferCreateInfo cInfo = 
+	VkBufferCreateInfo cInfo = { };
 	{
-		.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-		.usage = usageFlags,
-		.size = size,
-		.queueFamilyIndexCount = uniqueQueueFamilyCount,
-		.pQueueFamilyIndices = uniqueQueueFamilyIndices,
-		.sharingMode = (uniqueQueueFamilyCount > 1) ? VK_SHARING_MODE_CONCURRENT : VK_SHARING_MODE_EXCLUSIVE
+		cInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+		cInfo.usage = usageFlags;
+		cInfo.size = size;
+		cInfo.queueFamilyIndexCount = uniqueQueueFamilyCount;
+		cInfo.pQueueFamilyIndices = uniqueQueueFamilyIndices;
+		cInfo.sharingMode = (uniqueQueueFamilyCount > 1) ? VK_SHARING_MODE_CONCURRENT : VK_SHARING_MODE_EXCLUSIVE;
 	};
 
 	VkBuffer buffer;
@@ -1829,12 +1840,12 @@ PVK_LINKAGE VkDescriptorSet* pvkAllocateDescriptorSets(VkDevice device, VkDescri
 #ifdef PVK_IMPLEMENTATION
 PVK_LINKAGE VkDescriptorSet* pvkAllocateDescriptorSets(VkDevice device, VkDescriptorPool pool, uint32_t setCount, VkDescriptorSetLayout* setLayouts)
 {
-	VkDescriptorSetAllocateInfo allocInfo = 
+	VkDescriptorSetAllocateInfo allocInfo = { };
 	{
-		.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-		.descriptorPool = pool,
-		.descriptorSetCount = setCount,
-		.pSetLayouts = setLayouts
+		allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+		allocInfo.descriptorPool = pool;
+		allocInfo.descriptorSetCount = setCount;
+		allocInfo.pSetLayouts = setLayouts;
 	};
 
 	VkDescriptorSet* sets = newv(VkDescriptorSet, setCount);
@@ -1854,17 +1865,17 @@ PVK_LINKAGE VkDescriptorPool pvkCreateDescriptorPool(VkDevice device, u32 maxSet
 	{
 		poolSizes[i] = (VkDescriptorPoolSize)
 		{
-			va_arg(args, VkDescriptorType),
-			va_arg(args, u32)
+			(VkDescriptorType)va_arg(args, uint64_t),
+			(uint32_t)va_arg(args, uint64_t)
 		};
 	};
 	va_end(args);
-	VkDescriptorPoolCreateInfo cInfo = 
+	VkDescriptorPoolCreateInfo cInfo = { };
 	{
-		.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
-		.maxSets = maxSets,
-		.poolSizeCount = poolSize,
-		.pPoolSizes = poolSizes
+		cInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+		cInfo.maxSets = maxSets;
+		cInfo.poolSizeCount = poolSize;
+		cInfo.pPoolSizes = poolSizes;
 	};
 
 	VkDescriptorPool pool;
@@ -1877,22 +1888,22 @@ PVK_LINKAGE void pvkWriteImageViewToDescriptor(VkDevice device, VkDescriptorSet 
 #ifdef PVK_IMPLEMENTATION
 PVK_LINKAGE void pvkWriteImageViewToDescriptor(VkDevice device, VkDescriptorSet set, uint32_t binding, VkImageView imageView, VkSampler sampler, VkImageLayout layout, VkDescriptorType descriptorType)
 {
-	VkDescriptorImageInfo imageInfo = 
+	VkDescriptorImageInfo imageInfo = { };
 	{
-		.imageView = imageView,
-		.sampler = sampler,
-		.imageLayout = layout
+		imageInfo.imageView = imageView;
+		imageInfo.sampler = sampler;
+		imageInfo.imageLayout = layout;
 	};
 
-	VkWriteDescriptorSet writeInfo = 
+	VkWriteDescriptorSet writeInfo = { };
 	{
-		.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-		.dstSet = set,
-		.dstBinding = binding,
-		.dstArrayElement = 0,
-		.descriptorCount = 1,
-		.descriptorType = descriptorType,
-		.pImageInfo = &imageInfo
+		writeInfo.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		writeInfo.dstSet = set;
+		writeInfo.dstBinding = binding;
+		writeInfo.dstArrayElement = 0;
+		writeInfo.descriptorCount = 1;
+		writeInfo.descriptorType = descriptorType;
+		writeInfo.pImageInfo = &imageInfo;
 	};
 
 	vkUpdateDescriptorSets(device, 1, &writeInfo, 0, NULL);
@@ -1903,22 +1914,22 @@ PVK_LINKAGE void pvkWriteBufferToDescriptor(VkDevice device, VkDescriptorSet set
 #ifdef PVK_IMPLEMENTATION
 PVK_LINKAGE void pvkWriteBufferToDescriptor(VkDevice device, VkDescriptorSet set, uint32_t binding, VkBuffer buffer, VkDescriptorType descriptorType)
 {
-	VkDescriptorBufferInfo bufferInfo = 
+	VkDescriptorBufferInfo bufferInfo = { };
 	{
-		.buffer = buffer,
-		.offset = 0,
-		.range = VK_WHOLE_SIZE
+		bufferInfo.buffer = buffer;
+		bufferInfo.offset = 0;
+		bufferInfo.range = VK_WHOLE_SIZE;
 	};
 
-	VkWriteDescriptorSet writeInfo = 
+	VkWriteDescriptorSet writeInfo = { };
 	{
-		.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-		.dstSet = set,
-		.dstBinding = binding,
-		.dstArrayElement = 0,
-		.descriptorCount = 1,
-		.descriptorType = descriptorType,
-		.pBufferInfo = &bufferInfo
+		writeInfo.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		writeInfo.dstSet = set;
+		writeInfo.dstBinding = binding;
+		writeInfo.dstArrayElement = 0;
+		writeInfo.descriptorCount = 1;
+		writeInfo.descriptorType = descriptorType;
+		writeInfo.pBufferInfo = &bufferInfo;
 	};
 
 	vkUpdateDescriptorSets(device, 1, &writeInfo, 0, NULL);
@@ -1985,7 +1996,13 @@ PVK_LINKAGE PvkGeometry* pvkCreatePlaneGeometry(VkPhysicalDevice physicalDevice,
 		0, 3, 2
 	};
 
-	PvkGeometryData geometryData = { .vertices = vertices, .vertexCount = 4, .indices = indices, .indexCount = 6 };
+	PvkGeometryData geometryData = { };
+	{ 
+		geometryData.vertices = vertices; 
+		geometryData.vertexCount = 4;
+		geometryData.indices = indices;
+		geometryData.indexCount = 6;
+	};
 	return __pvkCreateGeometry(physicalDevice, device, queueFamilyIndexCount, queueFamilyIndices, &geometryData);
 }
 #endif
@@ -2048,7 +2065,13 @@ PVK_LINKAGE PvkGeometry* pvkCreateBoxGeometry(VkPhysicalDevice physicalDevice, V
 		20, 21, 22,
 		22, 23, 20
 	};
-	PvkGeometryData geometryData = { .vertices = vertices, .vertexCount = 24, .indices = indices, .indexCount = 36 };
+	PvkGeometryData geometryData = { };
+	{
+		geometryData.vertices = vertices; 
+		geometryData.vertexCount = 24;
+		geometryData.indices = indices;
+		geometryData.indexCount = 36;
+	};
 	return __pvkCreateGeometry(physicalDevice, device, queueFamilyIndexCount, queueFamilyIndices, &geometryData);
 }
 #endif
@@ -2176,3 +2199,7 @@ typedef struct PvkObjectData
 	PvkMat4 modelMatrix;
 	PvkMat4 normalMatrix;
 } PvkObjectData;
+
+#ifdef __cplusplus
+}
+#endif

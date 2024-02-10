@@ -77,7 +77,6 @@ static VkSampler pvkCreateShadowMapSampler(VkDevice device)
 		.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT,
 		.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT,
 		.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT,
-		.mipLodBias = 0,
 		.anisotropyEnable = VK_FALSE,
 		.maxAnisotropy = 1.0f, // Optional
 		.compareEnable = VK_FALSE,
@@ -319,7 +318,7 @@ static void recordCommandBuffers(u32 width, u32 height, VkCommandBuffer* command
 		pvkBeginCommandBuffer(commandBuffers[index], VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT);
 
 		/* shadow map renderpass */
-		VkClearValue shadowMapClearValue = { .depthStencil = { .depth = 1.0f, .stencil = 0.0f } };
+		VkClearValue shadowMapClearValue = { .depthStencil = { .depth = 1.0f, .stencil = 0 } };
 		pvkBeginRenderPass(commandBuffers[index], shadowMapRenderPass, *shadowMapFramebuffer, width, height, 1, &shadowMapClearValue);
 		vkCmdBindPipeline(commandBuffers[index], VK_PIPELINE_BIND_POINT_GRAPHICS, shadowMapPipeline);
 		vkCmdBindDescriptorSets(commandBuffers[index], VK_PIPELINE_BIND_POINT_GRAPHICS, shadowMapPipelineLayout, 0, 2, &set[1], 0, NULL);
