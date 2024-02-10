@@ -860,15 +860,15 @@ static VkSemaphore pvkCreateSemaphore(VkDevice device)
 	return semaphore;
 }
 
-static VkFence pvkCreateFence(VkDevice device)
+static VkFence pvkCreateFence(VkDevice device, VkFenceCreateFlags flags)
 {
-	VkFenceCreateInfo cInfo = { .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
+	VkFenceCreateInfo cInfo = { .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, .flags = flags };
 	VkFence fence;
 	PVK_CHECK(vkCreateFence(device, &cInfo, NULL, &fence));
 	return fence;
 }
 
-static void pvkSubmit(VkCommandBuffer commandBuffer, VkQueue queue, VkSemaphore wait, VkSemaphore signal)
+static void pvkSubmit(VkCommandBuffer commandBuffer, VkQueue queue, VkSemaphore wait, VkSemaphore signal, VkFence signalFence)
 {
 	VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 	VkSubmitInfo info =
@@ -882,7 +882,7 @@ static void pvkSubmit(VkCommandBuffer commandBuffer, VkQueue queue, VkSemaphore 
 		.commandBufferCount = 1,
 		.pCommandBuffers = &commandBuffer
 	};
-	PVK_CHECK(vkQueueSubmit(queue, 1, &info, VK_NULL_HANDLE));
+	PVK_CHECK(vkQueueSubmit(queue, 1, &info, signalFence));
 }
 
 static bool pvkPresent(uint32_t index, VkSwapchainKHR  swapchain, VkQueue queue, VkSemaphore wait)

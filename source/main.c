@@ -390,6 +390,22 @@ static void recordCommandBuffers(u32 width, u32 height, VkCommandBuffer* command
 	}
 }
 
+static bool getAvailableFence(VkDevice device, VkFence* fences, uint32_t fenceCount, VkFence* outFence)
+{
+	for(uint32_t i = 0; i < fenceCount; i++)
+	{
+		VkResult result = vkWaitForFences(device, 1, &fences[i], VK_TRUE, 0);
+		if(result == VK_SUCCESS)
+		{
+			PVK_CHECK(vkResetFences(device, 1, &fences[i]));
+			*outFence = fences[i];
+			return true;
+		}
+		else if(result != VK_TIMEOUT) PVK_CHECK(result);
+	}
+	return false;
+}
+
 int main()
 {
 	VkInstance instance = pvkCreateVulkanInstanceWithExtensions(2, "VK_KHR_win32_surface", "VK_KHR_surface");
@@ -554,11 +570,11 @@ int main()
 								planeGeometry,
 								boxGeometry);
 
-	PvkSemaphoreFIFOPool* semaphorePool = pvkCreateSemaphoreFIFOPool(logicalGPU, 20);
+	PvkSemaphoreFIFOPool* semaphorePool = pvkCreateSemaphoreFIFOPool(logicalGPU, 6);
 
 	VkFence fences[3];
 	for(uint32_t i = 0; i < 3; i++)
-		fences[i] = pvkCreateFence(logicalGPU);
+		fences[i] = pvkCreateFence(logicalGPU, VK_FENCE_CREATE_SIGNALED_BIT);
 
 	float angle = 0;
 	uint32_t fIndex = 0;
@@ -566,30 +582,15 @@ int main()
 	/* Rendering & Presentation */
 	while(!pvkWindowShouldClose(window))
 	{
-		VkSemaphore imageAvailableSemaphore = pvkSemaphoreFIFOPoolAcquire(semaphorePool);
-		uint32_t index = 0;
-		PVK_CHECK(vkAcquireNextImageKHR(logicalGPU, swapchain, UINT64_MAX, imageAvailableSemaphore, fences[fIndex++], &index));
-		if(fIndex >= fUnsignaledCount)
+		VkFence fence;
+		if(!getAvailableFence(logicalGPU, fences, 3, &fence))
 		{
-			PVK_CHECK(vkWaitForFences(logicalGPU, 1, &fences[0], VK_TRUE, UINT64_MAX));
-			PVK_CHECK(vkResetFences(logicalGPU, 1, &fences[0]));
-			fUnsignaledCount = 1;
-			VkResult result = vkWaitForFences(logicalGPU, 1, &fences[1], VK_TRUE, FENCE_WAIT_TIME);
-			if(result != VK_TIMEOUT)
-			{
-				PVK_CHECK(result);
-				PVK_CHECK(vkResetFences(logicalGPU, 1, &fences[1]));
-				fUnsignaledCount = 2;
-				result = vkWaitForFences(logicalGPU, 1, &fences[2], VK_TRUE, FENCE_WAIT_TIME);
-				if(result != VK_TIMEOUT)
-				{
-					PVK_CHECK(result);
-					PVK_CHECK(vkResetFences(logicalGPU, 1, &fences[2]));
-					fUnsignaledCount = 3;
-				}
-			}
-			fIndex = 0;
+			pvkWindowPollEvents(window);
+			continue;
 		}
+		VkSemaphore imageAvailableSemaphore = pvkSemaphoreFIFOPoolAcquire(semaphorePool);
+		uint32_t index;
+		PVK_CHECK(vkAcquireNextImageKHR(logicalGPU, swapchain, UINT64_MAX, imageAvailableSemaphore, fence, &index));
 
 		angle += 0.1f DEG;
 		objectData->modelMatrix = pvkMat4Transpose(pvkMat4Transform((PvkVec3) { 0, 0, 0 }, (PvkVec3) { 0, angle, 0 }));
@@ -598,7 +599,7 @@ int main()
 		
 		VkSemaphore renderFinishSemaphore = pvkSemaphoreFIFOPoolAcquire(semaphorePool);
 		// execute commands
-		pvkSubmit(commandBuffers[index], graphicsQueue, imageAvailableSemaphore, renderFinishSemaphore);
+		pvkSubmit(commandBuffers[index], graphicsQueue, imageAvailableSemaphore, renderFinishSemaphore, VK_NULL_HANDLE);
 
 		// present the output image
 		if(!pvkPresent(index, swapchain, presentQueue, renderFinishSemaphore))
@@ -713,6 +714,9 @@ int main()
 
 	PVK_CHECK(vkDeviceWaitIdle(logicalGPU));
 
+	for(uint32_t i = 0; i < 3; i++)
+		vkDestroyFence(logicalGPU, fences[i], NULL);
+	pvkDestroySemaphoreFIFOPool(logicalGPU, semaphorePool);
 	delete(clearValues);
 	delete(objectData);
 	delete(camera);
