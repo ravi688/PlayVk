@@ -868,6 +868,98 @@ static VkFence pvkCreateFence(VkDevice device, VkFenceCreateFlags flags)
 	return fence;
 }
 
+typedef struct PvkSemaphoreCircularPool
+{
+	VkSemaphore* semaphores;
+	uint32_t reserveCount;
+	uint32_t acquiredIndex;
+} PvkSemaphoreCircularPool;
+
+static PvkSemaphoreCircularPool* pvkCreateSemaphoreCircularPool(VkDevice device, uint32_t reserveCount)
+{
+	PvkSemaphoreCircularPool* pool = (PvkSemaphoreCircularPool*)malloc(sizeof(PvkSemaphoreCircularPool));
+	pool->semaphores = (VkSemaphore*)malloc(sizeof(VkSemaphore) * reserveCount);
+	pool->reserveCount = reserveCount;
+	pool->acquiredIndex = 0;
+	for(uint32_t i = 0; i < reserveCount; i++)
+		pool->semaphores[i] = pvkCreateSemaphore(device);
+	return pool;
+}
+
+static void pvkDestroySemaphoreCircularPool(VkDevice device, PvkSemaphoreCircularPool* pool)
+{
+	for(uint32_t i = 0; i < pool->reserveCount; i++)
+		vkDestroySemaphore(device, pool->semaphores[i], NULL);
+	memset((void*)pool, 0, sizeof(pool));
+	free(pool);
+}
+
+static VkSemaphore pvkSemaphoreCircularPoolAcquire(PvkSemaphoreCircularPool* pool, uint32_t* outIndex)
+{
+	VkSemaphore semaphore = pool->semaphores[pool->acquiredIndex];
+	if(outIndex != NULL)
+		*outIndex = pool->acquiredIndex;
+	pool->acquiredIndex = (pool->acquiredIndex + 1) % pool->reserveCount;
+	return semaphore;
+}
+
+static VkSemaphore pvkSemaphoreCircularPoolRecreate(VkDevice device, PvkSemaphoreCircularPool* pool, uint32_t index)
+{
+	vkDestroySemaphore(device, pool->semaphores[index], NULL);
+	pool->semaphores[index] = pvkCreateSemaphore(device);
+	return pool->semaphores[index];
+}
+
+static void pvkResetFences(VkDevice device, uint32_t fenceCount, VkFence* fences)
+{
+	PVK_CHECK(vkWaitForFences(device, fenceCount, fences, VK_TRUE, 0));
+	PVK_CHECK(vkResetFences(device, fenceCount, fences));
+}
+
+typedef struct PvkFencePool
+{
+	VkFence* fences;
+	uint32_t reserveCount;
+} PvkFencePool;
+
+static PvkFencePool* pvkCreateFencePool(VkDevice device, uint32_t reserveCount)
+{
+	PvkFencePool* pool = (PvkFencePool*)malloc(sizeof(PvkFencePool));
+	pool->fences = (VkFence*)malloc(sizeof(VkFence) * reserveCount);
+	pool->reserveCount = reserveCount;
+	for(uint32_t i = 0; i < reserveCount; i++)
+		pool->fences[i] = pvkCreateFence(device, VK_FENCE_CREATE_SIGNALED_BIT);
+	return pool;
+}
+
+static void pvkDestroyFencePool(VkDevice device, PvkFencePool* pool)
+{
+	PVK_CHECK(vkWaitForFences(device, pool->reserveCount, pool->fences, VK_TRUE, 0));
+	for(uint32_t i = 0; i < pool->reserveCount; i++)
+		vkDestroyFence(device, pool->fences[i], NULL);
+	memset((void*)pool, 0, sizeof(pool));
+	free(pool);
+}
+
+static bool pvkFencePoolAcquire(VkDevice device, PvkFencePool* pool, VkFence* outFence)
+{
+	VkFence* fences = pool->fences;
+	uint32_t fenceCount = pool->reserveCount;
+	for(uint32_t i = 0; i < fenceCount; i++)
+	{
+		VkResult result = vkWaitForFences(device, 1, &fences[i], VK_TRUE, 0);
+		if(result == VK_SUCCESS)
+		{
+			PVK_CHECK(vkResetFences(device, 1, &fences[i]));
+			*outFence = fences[i];
+			return true;
+		}
+		else if(result != VK_TIMEOUT) PVK_CHECK(result);
+	}
+	return false;
+}
+
+
 static void pvkSubmit(VkCommandBuffer commandBuffer, VkQueue queue, VkSemaphore wait, VkSemaphore signal, VkFence signalFence)
 {
 	VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;

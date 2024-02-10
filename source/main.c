@@ -1,6 +1,5 @@
 
 #include <PlayVk/PlayVk.h>
-#include <bufferlib/buffer.h>
 
 #define FENCE_WAIT_TIME 5 /* nano seconds */
 
@@ -298,56 +297,6 @@ static VkDescriptorSetLayout pvkCreateObjectSetLayout(VkDevice device)
 	return setLayout;
 }
 
-typedef buffer_t VkSemaphoreList;
-
-typedef struct PvkSemaphoreFIFOPool
-{
-	VkSemaphoreList semaphores;
-	uint32_t acquiredIndex;
-} PvkSemaphoreFIFOPool;
-
-PvkSemaphoreFIFOPool* pvkCreateSemaphoreFIFOPool(VkDevice device, uint32_t reserveCount)
-{
-	PvkSemaphoreFIFOPool* pool = (PvkSemaphoreFIFOPool*)malloc(sizeof(PvkSemaphoreFIFOPool));
-	pool->semaphores = buf_create(sizeof(VkSemaphore), reserveCount, 0);
-	pool->acquiredIndex = 0;
-	for(uint32_t i = 0; i < reserveCount; i++)
-	{
-		VkSemaphore semaphore = pvkCreateSemaphore(device);
-		buf_push(&pool->semaphores, &semaphore);
-	}
-	return pool;
-}
-
-void pvkDestroySemaphoreFIFOPool(VkDevice device, PvkSemaphoreFIFOPool* pool)
-{
-	uint32_t reserveCount = (uint32_t)buf_get_capacity(&pool->semaphores);
-	for(uint32_t i = 0; i < reserveCount; i++)
-		vkDestroySemaphore(device, buf_get_value_at_typeof(&pool->semaphores, VkSemaphore, i), NULL);
-	buf_free(&pool->semaphores);
-	memset((void*)pool, 0, sizeof(pool));
-	free(pool);
-}
-
-VkSemaphore pvkSemaphoreFIFOPoolAcquire(PvkSemaphoreFIFOPool* pool, uint32_t* outIndex)
-{
-	VkSemaphore semaphore = buf_get_value_at_typeof(&pool->semaphores, VkSemaphore, pool->acquiredIndex);
-	uint32_t reserveCount = (uint32_t)buf_get_capacity(&pool->semaphores);
-	if(outIndex != NULL)
-		*outIndex = pool->acquiredIndex;
-	pool->acquiredIndex = (pool->acquiredIndex + 1) % reserveCount;
-	return semaphore;
-}
-
-VkSemaphore pvkSemaphoreFIFOPoolRecreate(VkDevice device, PvkSemaphoreFIFOPool* pool, uint32_t index)
-{
-	VkSemaphore* semaphore = buf_get_ptr_at_typeof(&pool->semaphores, VkSemaphore, index);
-	vkDestroySemaphore(device, *semaphore, NULL);
-	*semaphore = pvkCreateSemaphore(device);
-	return *semaphore;
-}
-
-
 static void recordCommandBuffers(u32 width, u32 height, VkCommandBuffer* commandBuffers,
 							    VkClearValue* clearValues,
 								VkRenderPass renderPass, 
@@ -398,22 +347,6 @@ static void recordCommandBuffers(u32 width, u32 height, VkCommandBuffer* command
 
 		pvkEndCommandBuffer(commandBuffers[index]);
 	}
-}
-
-static bool getAvailableFence(VkDevice device, VkFence* fences, uint32_t fenceCount, VkFence* outFence)
-{
-	for(uint32_t i = 0; i < fenceCount; i++)
-	{
-		VkResult result = vkWaitForFences(device, 1, &fences[i], VK_TRUE, 0);
-		if(result == VK_SUCCESS)
-		{
-			PVK_CHECK(vkResetFences(device, 1, &fences[i]));
-			*outFence = fences[i];
-			return true;
-		}
-		else if(result != VK_TIMEOUT) PVK_CHECK(result);
-	}
-	return false;
 }
 
 int main()
@@ -580,24 +513,21 @@ int main()
 								planeGeometry,
 								boxGeometry);
 
-	PvkSemaphoreFIFOPool* semaphorePool = pvkCreateSemaphoreFIFOPool(logicalGPU, 6);
-
-	VkFence fences[3];
-	for(uint32_t i = 0; i < 3; i++)
-		fences[i] = pvkCreateFence(logicalGPU, VK_FENCE_CREATE_SIGNALED_BIT);
+	PvkSemaphoreCircularPool* semaphorePool = pvkCreateSemaphoreCircularPool(logicalGPU, 6);
+	PvkFencePool* fencePool = pvkCreateFencePool(logicalGPU, 3);
 
 	float angle = 0;
 	/* Rendering & Presentation */
 	while(!pvkWindowShouldClose(window))
 	{
 		VkFence fence;
-		if(!getAvailableFence(logicalGPU, fences, 3, &fence))
+		if(!pvkFencePoolAcquire(logicalGPU, fencePool, &fence))
 		{
 			pvkWindowPollEvents(window);
 			continue;
 		}
 		uint32_t semaphoreIndex;
-		VkSemaphore imageAvailableSemaphore = pvkSemaphoreFIFOPoolAcquire(semaphorePool, &semaphoreIndex);
+		VkSemaphore imageAvailableSemaphore = pvkSemaphoreCircularPoolAcquire(semaphorePool, &semaphoreIndex);
 		uint32_t index;
 		while(!pvkAcquireNextImageKHR(logicalGPU, swapchain, UINT64_MAX, imageAvailableSemaphore, fence, &index))
 		{
@@ -619,9 +549,8 @@ int main()
 			vkDestroySwapchainKHR(logicalGPU, swapchain, NULL);
 			vkDestroySurfaceKHR(instance, surface, NULL);
 
-			imageAvailableSemaphore = pvkSemaphoreFIFOPoolRecreate(logicalGPU, semaphorePool, semaphoreIndex);
-			PVK_CHECK(vkWaitForFences(logicalGPU, 1, &fence, VK_TRUE, 0));
-			PVK_CHECK(vkResetFences(logicalGPU, 1, &fence));
+			imageAvailableSemaphore = pvkSemaphoreCircularPoolRecreate(logicalGPU, semaphorePool, semaphoreIndex);
+			pvkResetFences(logicalGPU, 1, &fence);
 
 			surface = pvkWindowCreateVulkanSurface(window, instance);
 			swapchain = pvkCreateSwapchain(logicalGPU, surface, 
@@ -718,7 +647,7 @@ int main()
 		objectData->normalMatrix = pvkMat4Inverse(objectData->modelMatrix);
 		pvkUploadToMemory(logicalGPU, objectUniformBuffer.memory, objectData, sizeof(PvkObjectData));
 		
-		VkSemaphore renderFinishSemaphore = pvkSemaphoreFIFOPoolAcquire(semaphorePool, NULL);
+		VkSemaphore renderFinishSemaphore = pvkSemaphoreCircularPoolAcquire(semaphorePool, NULL);
 		// execute commands
 		pvkSubmit(commandBuffers[index], graphicsQueue, imageAvailableSemaphore, renderFinishSemaphore, VK_NULL_HANDLE);
 
@@ -743,7 +672,7 @@ int main()
 			vkDestroySwapchainKHR(logicalGPU, swapchain, NULL);
 			vkDestroySurfaceKHR(instance, surface, NULL);
 
-			// pvkSemaphoreFIFOPoolReset(semaphorePool);
+			// pvkSemaphoreCircularPoolReset(semaphorePool);
 
 			surface = pvkWindowCreateVulkanSurface(window, instance);
 			swapchain = pvkCreateSwapchain(logicalGPU, surface, 
@@ -840,10 +769,8 @@ int main()
 
 	PVK_CHECK(vkDeviceWaitIdle(logicalGPU));
 
-	PVK_CHECK(vkWaitForFences(logicalGPU, 3, fences, VK_TRUE, 0));
-	for(uint32_t i = 0; i < 3; i++)
-		vkDestroyFence(logicalGPU, fences[i], NULL);
-	pvkDestroySemaphoreFIFOPool(logicalGPU, semaphorePool);
+	pvkDestroyFencePool(logicalGPU, fencePool);
+	pvkDestroySemaphoreCircularPool(logicalGPU, semaphorePool);
 	delete(clearValues);
 	delete(objectData);
 	delete(camera);
