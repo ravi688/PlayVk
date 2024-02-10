@@ -587,8 +587,6 @@ int main()
 		fences[i] = pvkCreateFence(logicalGPU, VK_FENCE_CREATE_SIGNALED_BIT);
 
 	float angle = 0;
-	uint32_t fIndex = 0;
-	uint32_t fUnsignaledCount = 3;
 	/* Rendering & Presentation */
 	while(!pvkWindowShouldClose(window))
 	{
