@@ -329,12 +329,22 @@ void pvkDestroySemaphoreFIFOPool(VkDevice device, PvkSemaphoreFIFOPool* pool)
 	free(pool);
 }
 
-VkSemaphore pvkSemaphoreFIFOPoolAcquire(PvkSemaphoreFIFOPool* pool)
+VkSemaphore pvkSemaphoreFIFOPoolAcquire(PvkSemaphoreFIFOPool* pool, uint32_t* outIndex)
 {
 	VkSemaphore semaphore = buf_get_value_at_typeof(&pool->semaphores, VkSemaphore, pool->acquiredIndex);
 	uint32_t reserveCount = (uint32_t)buf_get_capacity(&pool->semaphores);
+	if(outIndex != NULL)
+		*outIndex = pool->acquiredIndex;
 	pool->acquiredIndex = (pool->acquiredIndex + 1) % reserveCount;
 	return semaphore;
+}
+
+VkSemaphore pvkSemaphoreFIFOPoolRecreate(VkDevice device, PvkSemaphoreFIFOPool* pool, uint32_t index)
+{
+	VkSemaphore* semaphore = buf_get_ptr_at_typeof(&pool->semaphores, VkSemaphore, index);
+	vkDestroySemaphore(device, *semaphore, NULL);
+	*semaphore = pvkCreateSemaphore(device);
+	return *semaphore;
 }
 
 
@@ -588,29 +598,20 @@ int main()
 			pvkWindowPollEvents(window);
 			continue;
 		}
-		VkSemaphore imageAvailableSemaphore = pvkSemaphoreFIFOPoolAcquire(semaphorePool);
+		uint32_t semaphoreIndex;
+		VkSemaphore imageAvailableSemaphore = pvkSemaphoreFIFOPoolAcquire(semaphorePool, &semaphoreIndex);
 		uint32_t index;
-		PVK_CHECK(vkAcquireNextImageKHR(logicalGPU, swapchain, UINT64_MAX, imageAvailableSemaphore, fence, &index));
-
-		angle += 0.1f DEG;
-		objectData->modelMatrix = pvkMat4Transpose(pvkMat4Transform((PvkVec3) { 0, 0, 0 }, (PvkVec3) { 0, angle, 0 }));
-		objectData->normalMatrix = pvkMat4Inverse(objectData->modelMatrix);
-		pvkUploadToMemory(logicalGPU, objectUniformBuffer.memory, objectData, sizeof(PvkObjectData));
-		
-		VkSemaphore renderFinishSemaphore = pvkSemaphoreFIFOPoolAcquire(semaphorePool);
-		// execute commands
-		pvkSubmit(commandBuffers[index], graphicsQueue, imageAvailableSemaphore, renderFinishSemaphore, VK_NULL_HANDLE);
-
-		// present the output image
-		if(!pvkPresent(index, swapchain, presentQueue, renderFinishSemaphore))
+		while(!pvkAcquireNextImageKHR(logicalGPU, swapchain, UINT64_MAX, imageAvailableSemaphore, fence, &index))
 		{
-			vkDestroySurfaceKHR(instance, surface, NULL);;
+			PVK_CHECK(vkDeviceWaitIdle(logicalGPU));
 			vkDestroyPipeline(logicalGPU, shadowMapPipeline, NULL);
 			vkDestroyPipeline(logicalGPU, pipeline2, NULL);
 			vkDestroyPipeline(logicalGPU, pipeline, NULL);
+			pvkDestroyFramebuffers(logicalGPU, 1, shadowMapFramebuffer);
 			delete(shadowMapFramebuffer);
 			vkDestroyImageView(logicalGPU, shadowMapAttachment, NULL);
 			pvkDestroyImage(logicalGPU, shadowMapImage);
+			pvkDestroyFramebuffers(logicalGPU, 3, framebuffers);
 			delete(framebuffers);
 			vkDestroyImageView(logicalGPU, depthAttachment, NULL);
 			pvkDestroyImage(logicalGPU, depthImage);
@@ -618,6 +619,133 @@ int main()
 			pvkDestroyImage(logicalGPU, auxImage);
 			pvkDestroySwapchainImageViews(logicalGPU, swapchain, swapchainImageViews);
 			vkDestroySwapchainKHR(logicalGPU, swapchain, NULL);
+			vkDestroySurfaceKHR(instance, surface, NULL);
+
+			imageAvailableSemaphore = pvkSemaphoreFIFOPoolRecreate(logicalGPU, semaphorePool, semaphoreIndex);
+			PVK_CHECK(vkWaitForFences(logicalGPU, 1, &fence, VK_TRUE, 0));
+			PVK_CHECK(vkResetFences(logicalGPU, 1, &fence));
+
+			surface = pvkWindowCreateVulkanSurface(window, instance);
+			swapchain = pvkCreateSwapchain(logicalGPU, surface, 
+													window->width, window->height, 
+													VK_FORMAT_B8G8R8A8_SRGB, 
+													VK_COLOR_SPACE_SRGB_NONLINEAR_KHR, 
+													VK_PRESENT_MODE_FIFO_KHR,
+													2, queueFamilyIndices, VK_NULL_HANDLE);
+			swapchainImageViews = pvkCreateSwapchainImageViews(logicalGPU, swapchain, VK_FORMAT_B8G8R8A8_SRGB);
+
+			auxImage = pvkCreateImage(physicalGPU, logicalGPU, 
+										VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, 
+										VK_FORMAT_B8G8R8A8_SRGB, window->width, window->height, 
+										VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT, 
+										2, queueFamilyIndices);
+			auxAttachment = pvkCreateImageView(logicalGPU, auxImage.handle, VK_FORMAT_B8G8R8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT);
+			
+			depthImage = pvkCreateImage(physicalGPU, logicalGPU, 
+										VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+										VK_FORMAT_D32_SFLOAT, window->width, window->height,
+										VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+										2, queueFamilyIndices);
+			depthAttachment = pvkCreateImageView(logicalGPU, depthImage.handle, VK_FORMAT_D32_SFLOAT, VK_IMAGE_ASPECT_DEPTH_BIT);
+			
+			attachments[0] = swapchainImageViews[0];
+			attachments[1] = auxAttachment;
+			attachments[2] = depthAttachment;				// framebuffer for swapchain image 0
+			attachments[3] = swapchainImageViews[1];
+			attachments[4] = auxAttachment;
+			attachments[5] = depthAttachment;				// framebuffer for swapchain image 1
+			attachments[6] = swapchainImageViews[2];
+			attachments[7] = auxAttachment;
+			attachments[8] = depthAttachment;				// framebuffer for swapchain image 2
+			framebuffers = pvkCreateFramebuffers(logicalGPU, renderPass, window->width, window->height, 3, 3, attachments);
+
+			shadowMapImage = pvkCreateImage(physicalGPU, logicalGPU,
+												VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+												VK_FORMAT_D32_SFLOAT, window->width, window->height,
+												VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+												2, queueFamilyIndices);
+			shadowMapAttachment = pvkCreateImageView(logicalGPU, shadowMapImage.handle, VK_FORMAT_D32_SFLOAT, VK_IMAGE_ASPECT_DEPTH_BIT);
+			shadowMapFramebuffer = pvkCreateFramebuffers(logicalGPU, shadowMapRenderPass, window->width, window->height, 1, 1, &shadowMapAttachment);
+
+			pipeline = pvkCreateGraphicsPipeline(logicalGPU, pipelineLayout, renderPass, 0, 1, window->width, window->height, 2,
+													(PvkShader) { fragmentShader, PVK_SHADER_TYPE_FRAGMENT },
+													(PvkShader) { vertexShader, PVK_SHADER_TYPE_VERTEX });
+			pipeline2 = pvkCreateGraphicsPipeline(logicalGPU, pipelineLayout2, renderPass, 1, 1, window->width, window->height, 2,
+													(PvkShader) { fragmentShaderPass2, PVK_SHADER_TYPE_FRAGMENT },
+													(PvkShader) { vertexShaderPass2, PVK_SHADER_TYPE_VERTEX });
+			shadowMapPipeline = pvkCreateShadowMapGraphicsPipeline(logicalGPU, shadowMapPipelineLayout, shadowMapRenderPass, 0, window->width, window->height, 1,
+													(PvkShader) { shadowMapVertexShader, PVK_SHADER_TYPE_VERTEX });
+
+			delete(camera);
+			camera = pvkCreateCamera((float)window->width / window->height, PVK_PROJECTION_TYPE_PERSPECTIVE, 65 DEG);	
+			PvkGlobalData* globalData = new(PvkGlobalData);
+			globalData->projectionMatrix = pvkMat4Transpose(camera->projection);
+			globalData->viewMatrix = pvkMat4Transpose(camera->view);
+			globalData->dirLight.dir = pvkVec3Normalize((PvkVec3) { 1, -1, 0 });
+			globalData->dirLight.intensity = 1.0f;
+			globalData->dirLight.color = (PvkVec3) { 1, 1, 1 };
+			globalData->lightProjectionMatrix = pvkMat4Transpose(pvkMat4OrthoProj(10, 1, 1, 20));
+			globalData->lightViewMatrix = pvkMat4Transpose(pvkMat4Inverse(pvkMat4Mul(pvkMat4Translate((PvkVec3) { -4.0f, 4.0f, 0 }), pvkMat4Rotate((PvkVec3) { -20 DEG, -90 DEG, 0 }))));
+			globalData->ambLight.color = (PvkVec3) { 0.3f, 0.3f, 0.3f };
+			globalData->ambLight.intensity = 1.0f;
+			objectData->modelMatrix = pvkMat4Transpose(pvkMat4Rotate((PvkVec3) { 0 DEG, 0, 0 }));
+			objectData->normalMatrix = pvkMat4Inverse(objectData->modelMatrix);
+			pvkUploadToMemory(logicalGPU, globalUniformBuffer.memory, globalData, sizeof(PvkGlobalData));
+			pvkUploadToMemory(logicalGPU, objectUniformBuffer.memory, objectData, sizeof(PvkObjectData));
+			delete(globalData);
+
+			pvkWriteImageViewToDescriptor(logicalGPU, set[0], 0, auxAttachment, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT);
+			pvkWriteImageViewToDescriptor(logicalGPU, set[3], 3, shadowMapAttachment, shadowMapSampler, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+
+
+			recordCommandBuffers(window->width, window->height, commandBuffers,
+								clearValues,
+								renderPass, 
+								shadowMapRenderPass, 
+								shadowMapFramebuffer,
+								framebuffers,
+								shadowMapPipeline,
+								pipeline,
+								pipeline2,
+								shadowMapPipelineLayout,
+								pipelineLayout,
+								pipelineLayout2,
+								set,
+								planeGeometry,
+								boxGeometry);
+		}
+
+		angle += 0.1f DEG;
+		objectData->modelMatrix = pvkMat4Transpose(pvkMat4Transform((PvkVec3) { 0, 0, 0 }, (PvkVec3) { 0, angle, 0 }));
+		objectData->normalMatrix = pvkMat4Inverse(objectData->modelMatrix);
+		pvkUploadToMemory(logicalGPU, objectUniformBuffer.memory, objectData, sizeof(PvkObjectData));
+		
+		VkSemaphore renderFinishSemaphore = pvkSemaphoreFIFOPoolAcquire(semaphorePool, NULL);
+		// execute commands
+		pvkSubmit(commandBuffers[index], graphicsQueue, imageAvailableSemaphore, renderFinishSemaphore, VK_NULL_HANDLE);
+
+		// present the output image
+		if(!pvkPresent(index, swapchain, presentQueue, renderFinishSemaphore))
+		{
+			PVK_CHECK(vkDeviceWaitIdle(logicalGPU));
+			vkDestroyPipeline(logicalGPU, shadowMapPipeline, NULL);
+			vkDestroyPipeline(logicalGPU, pipeline2, NULL);
+			vkDestroyPipeline(logicalGPU, pipeline, NULL);
+			pvkDestroyFramebuffers(logicalGPU, 1, shadowMapFramebuffer);
+			delete(shadowMapFramebuffer);
+			vkDestroyImageView(logicalGPU, shadowMapAttachment, NULL);
+			pvkDestroyImage(logicalGPU, shadowMapImage);
+			pvkDestroyFramebuffers(logicalGPU, 3, framebuffers);
+			delete(framebuffers);
+			vkDestroyImageView(logicalGPU, depthAttachment, NULL);
+			pvkDestroyImage(logicalGPU, depthImage);
+			vkDestroyImageView(logicalGPU, auxAttachment, NULL);
+			pvkDestroyImage(logicalGPU, auxImage);
+			pvkDestroySwapchainImageViews(logicalGPU, swapchain, swapchainImageViews);
+			vkDestroySwapchainKHR(logicalGPU, swapchain, NULL);
+			vkDestroySurfaceKHR(instance, surface, NULL);
+
+			// pvkSemaphoreFIFOPoolReset(semaphorePool);
 
 			surface = pvkWindowCreateVulkanSurface(window, instance);
 			swapchain = pvkCreateSwapchain(logicalGPU, surface, 
@@ -714,6 +842,7 @@ int main()
 
 	PVK_CHECK(vkDeviceWaitIdle(logicalGPU));
 
+	PVK_CHECK(vkWaitForFences(logicalGPU, 3, fences, VK_TRUE, 0));
 	for(uint32_t i = 0; i < 3; i++)
 		vkDestroyFence(logicalGPU, fences[i], NULL);
 	pvkDestroySemaphoreFIFOPool(logicalGPU, semaphorePool);

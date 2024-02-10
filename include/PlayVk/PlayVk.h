@@ -885,6 +885,17 @@ static void pvkSubmit(VkCommandBuffer commandBuffer, VkQueue queue, VkSemaphore 
 	PVK_CHECK(vkQueueSubmit(queue, 1, &info, signalFence));
 }
 
+static bool pvkAcquireNextImageKHR(VkDevice device, VkSwapchainKHR swapchain, uint64_t timeout, VkSemaphore waitSemaphore, VkFence waitFence, uint32_t* outIndex)
+{
+	uint32_t index;
+	VkResult result = vkAcquireNextImageKHR(device, swapchain, timeout, waitSemaphore, waitFence, outIndex);
+	if((result == VK_ERROR_OUT_OF_DATE_KHR) || (result == VK_SUBOPTIMAL_KHR))
+		return false;
+	else
+		PVK_CHECK(result);
+	return true;
+}
+
 static bool pvkPresent(uint32_t index, VkSwapchainKHR  swapchain, VkQueue queue, VkSemaphore wait)
 {
 	VkResult result;
