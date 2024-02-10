@@ -1,4 +1,5 @@
 
+#define PVK_IMPLEMENTATION
 #include <PlayVk/PlayVk.h>
 
 #define FENCE_WAIT_TIME 5 /* nano seconds */
