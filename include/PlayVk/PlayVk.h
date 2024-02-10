@@ -17,6 +17,7 @@
 #define PVK_STATIC static
 #define PVK_LINKAGE static
 #define PVK_INLINE inline
+// #define PVK_DEBUG
 
 #if defined(__cpluscplus) && (__cpluscplus >= 201103L)
 #	define PVK_CONSTEXPR constexpr
@@ -356,7 +357,7 @@ typedef struct PvkWindow
 } PvkWindow;
 
 
-#if GLOBAL_DEBUG
+#if PVK_DEBUG
 PVK_LINKAGE void glfwErrorCallback(int code, const char* description)
 {
 	PVK_ERROR("GLFW: %d, %s", code, description);
@@ -374,7 +375,7 @@ PVK_LINKAGE PvkWindow* pvkWindowCreate(uint32_t width, uint32_t height, const ch
 {
 	PvkWindow* window = new(PvkWindow);
 	glfwInit();
-#if GLOBAL_DEBUG
+#if PVK_DEBUG
 	glfwSetErrorCallback(glfwErrorCallback);
 #endif
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
