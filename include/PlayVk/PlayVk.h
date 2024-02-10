@@ -710,8 +710,11 @@ PVK_LINKAGE VkPhysicalDevice pvkGetPhysicalDevice(VkInstance instance, VkSurface
 											VkColorSpaceKHR colorSpace, 
 											VkPresentModeKHR presentMode)
 {
-	uint32_t deviceCount;
-	PVK_CHECK(vkEnumeratePhysicalDevices(instance, &deviceCount, NULL));
+	uint32_t deviceCount = 0;
+	VkResult result = vkEnumeratePhysicalDevices(instance, &deviceCount, NULL);
+	if(result == VK_INCOMPLETE)
+		PVK_FETAL_ERROR("No Vulkan Compatible Device is found. Exiting...");
+	else PVK_CHECK(result);
 	VkPhysicalDevice* devices = newv(VkPhysicalDevice, deviceCount);
 	PVK_CHECK(vkEnumeratePhysicalDevices(instance, &deviceCount, devices));
 
