@@ -359,7 +359,7 @@ int main()
 														VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, 
 														VK_FORMAT_B8G8R8A8_SRGB, 
 														VK_COLOR_SPACE_SRGB_NONLINEAR_KHR, 
-														VK_PRESENT_MODE_FIFO_KHR);
+														VK_PRESENT_MODE_FIFO_KHR, 3);
 	uint32_t graphicsQueueFamilyIndex = pvkFindQueueFamilyIndex(physicalGPU, VK_QUEUE_GRAPHICS_BIT);
 	uint32_t presentQueueFamilyIndex = pvkFindQueueFamilyIndexWithPresentSupport(physicalGPU, surface);
 	uint32_t queueFamilyIndices[2] = { graphicsQueueFamilyIndex, presentQueueFamilyIndex };
@@ -371,7 +371,7 @@ int main()
 	vkGetDeviceQueue(logicalGPU, graphicsQueueFamilyIndex, 0, &graphicsQueue);
 	vkGetDeviceQueue(logicalGPU, presentQueueFamilyIndex, 0, &presentQueue);
 
-	VkSwapchainKHR swapchain = pvkCreateSwapchain(logicalGPU, surface, 
+	VkSwapchainKHR swapchain = pvkCreateSwapchain(logicalGPU, surface, 3, 
 													800, 800, 
 													VK_FORMAT_B8G8R8A8_SRGB, 
 													VK_COLOR_SPACE_SRGB_NONLINEAR_KHR, 
@@ -387,7 +387,7 @@ int main()
 	/* Render Pass & Framebuffer attachments */
 	VkRenderPass shadowMapRenderPass = pvkCreateShadowMapRenderPass(logicalGPU);
 	VkRenderPass renderPass = pvkCreateRenderPass2(logicalGPU);
-	VkImageView* swapchainImageViews = pvkCreateSwapchainImageViews(logicalGPU, swapchain, VK_FORMAT_B8G8R8A8_SRGB);
+	VkImageView* swapchainImageViews = pvkCreateSwapchainImageViews(logicalGPU, swapchain, VK_FORMAT_B8G8R8A8_SRGB, NULL);
 	PvkImage auxImage = pvkCreateImage(physicalGPU, logicalGPU, 
 										VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, 
 										VK_FORMAT_B8G8R8A8_SRGB, 800, 800, 
@@ -554,13 +554,13 @@ int main()
 			pvkResetFences(logicalGPU, 1, &fence);
 
 			surface = pvkWindowCreateVulkanSurface(window, instance);
-			swapchain = pvkCreateSwapchain(logicalGPU, surface, 
+			swapchain = pvkCreateSwapchain(logicalGPU, surface, 3, 
 													window->width, window->height, 
 													VK_FORMAT_B8G8R8A8_SRGB, 
 													VK_COLOR_SPACE_SRGB_NONLINEAR_KHR, 
 													VK_PRESENT_MODE_FIFO_KHR,
 													2, queueFamilyIndices, VK_NULL_HANDLE);
-			swapchainImageViews = pvkCreateSwapchainImageViews(logicalGPU, swapchain, VK_FORMAT_B8G8R8A8_SRGB);
+			swapchainImageViews = pvkCreateSwapchainImageViews(logicalGPU, swapchain, VK_FORMAT_B8G8R8A8_SRGB, NULL);
 
 			auxImage = pvkCreateImage(physicalGPU, logicalGPU, 
 										VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, 
@@ -676,13 +676,13 @@ int main()
 			// pvkSemaphoreCircularPoolReset(semaphorePool);
 
 			surface = pvkWindowCreateVulkanSurface(window, instance);
-			swapchain = pvkCreateSwapchain(logicalGPU, surface, 
+			swapchain = pvkCreateSwapchain(logicalGPU, surface, 3, 
 													window->width, window->height, 
 													VK_FORMAT_B8G8R8A8_SRGB, 
 													VK_COLOR_SPACE_SRGB_NONLINEAR_KHR, 
 													VK_PRESENT_MODE_FIFO_KHR,
 													2, queueFamilyIndices, VK_NULL_HANDLE);
-			swapchainImageViews = pvkCreateSwapchainImageViews(logicalGPU, swapchain, VK_FORMAT_B8G8R8A8_SRGB);
+			swapchainImageViews = pvkCreateSwapchainImageViews(logicalGPU, swapchain, VK_FORMAT_B8G8R8A8_SRGB, NULL);
 
 			auxImage = pvkCreateImage(physicalGPU, logicalGPU, 
 										VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, 
