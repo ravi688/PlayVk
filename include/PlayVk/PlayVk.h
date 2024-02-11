@@ -1611,9 +1611,9 @@ PVK_STATIC PVK_INLINE PVK_CONSTEXPR VkVertexInputAttributeDescription __pvkGetVe
 	return dsc;
 }
 
-PVK_LINKAGE VkPipeline __pvkCreateGraphicsPipeline(VkDevice device, VkPipelineLayout layout, VkRenderPass renderPass, uint32_t subpassIndex, uint32_t width, uint32_t height, VkPipelineColorBlendStateCreateInfo* colorBlend, bool enableDepth, uint32_t count, va_list args);
+PVK_LINKAGE VkPipeline __pvkCreateGraphicsPipeline(VkDevice device, VkPipelineLayout layout, VkRenderPass renderPass, uint32_t subpassIndex, uint32_t width, uint32_t height, uint32_t vertInputBindCount, VkVertexInputBindingDescription* vertexBindingDescriptions, uint32_t vertInputAttrCount, VkVertexInputAttributeDescription* vertexAttributeDescriptions, VkPipelineColorBlendStateCreateInfo* colorBlend, bool enableDepth, uint32_t count, va_list args);
 #ifdef PVK_IMPLEMENTATION
-PVK_LINKAGE VkPipeline __pvkCreateGraphicsPipeline(VkDevice device, VkPipelineLayout layout, VkRenderPass renderPass, uint32_t subpassIndex, uint32_t width, uint32_t height, VkPipelineColorBlendStateCreateInfo* colorBlend, bool enableDepth, uint32_t count, va_list args)
+PVK_LINKAGE VkPipeline __pvkCreateGraphicsPipeline(VkDevice device, VkPipelineLayout layout, VkRenderPass renderPass, uint32_t subpassIndex, uint32_t width, uint32_t height, uint32_t vertInputBindCount, VkVertexInputBindingDescription* vertexBindingDescriptions, uint32_t vertInputAttrCount, VkVertexInputAttributeDescription* vertexAttributeDescriptions, VkPipelineColorBlendStateCreateInfo* colorBlend, bool enableDepth, uint32_t count, va_list args)
 {
 	/* Shader modules */
 	PvkShader shaderModules[count];
@@ -1622,24 +1622,12 @@ PVK_LINKAGE VkPipeline __pvkCreateGraphicsPipeline(VkDevice device, VkPipelineLa
 	VkPipelineShaderStageCreateInfo* stageCInfos = __pvkCreatePipelineShaderStageCreateInfos(count, shaderModules);
 
 	/* Vertex buffer layouts and their description */
-	VkVertexInputBindingDescription vertexBindingDescription = { };
-	{
-		vertexBindingDescription.binding = 0;
-		vertexBindingDescription.stride = PVK_VERTEX_SIZE;
-		vertexBindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-	};
-	VkVertexInputAttributeDescription* vertexAttributeDescriptions = PVK_NEWV(VkVertexInputAttributeDescription, PVK_VERTEX_ATTRIBUTE_COUNT);
-	vertexAttributeDescriptions[0] = __pvkGetVertexInputAttributeDescription(0, 0, VK_FORMAT_R32G32B32_SFLOAT, PVK_VERTEX_POSITION_OFFSET);
-	vertexAttributeDescriptions[1] = __pvkGetVertexInputAttributeDescription(0, 1, VK_FORMAT_R32G32B32_SFLOAT, PVK_VERTEX_NORMAL_OFFSET);
-	vertexAttributeDescriptions[2] = __pvkGetVertexInputAttributeDescription(0, 2, VK_FORMAT_R32G32_SFLOAT, PVK_VERTEX_TEXCOORD_OFFSET);
-	vertexAttributeDescriptions[3] = __pvkGetVertexInputAttributeDescription(0, 3, VK_FORMAT_R32G32B32A32_SFLOAT, PVK_VERTEX_COLOR_OFFSET);
-
 	VkPipelineVertexInputStateCreateInfo vertexInputStateCInfo = { };
 	{
 		vertexInputStateCInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-		vertexInputStateCInfo.vertexBindingDescriptionCount = 1;
-		vertexInputStateCInfo.pVertexBindingDescriptions = &vertexBindingDescription;
-		vertexInputStateCInfo.vertexAttributeDescriptionCount = PVK_VERTEX_ATTRIBUTE_COUNT;
+		vertexInputStateCInfo.vertexBindingDescriptionCount = vertInputBindCount;
+		vertexInputStateCInfo.pVertexBindingDescriptions = vertexBindingDescriptions;
+		vertexInputStateCInfo.vertexAttributeDescriptionCount = vertInputAttrCount;
 		vertexInputStateCInfo.pVertexAttributeDescriptions = vertexAttributeDescriptions;
 	};
 
@@ -1728,7 +1716,6 @@ PVK_LINKAGE VkPipeline __pvkCreateGraphicsPipeline(VkDevice device, VkPipelineLa
 	PVK_CHECK(vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineCInfo, NULL, &pipeline));
 
 	PVK_DELETE(stageCInfos);
-	PVK_DELETE(vertexAttributeDescriptions);
 	return pipeline;
 }
 #endif
@@ -1737,9 +1724,51 @@ PVK_LINKAGE VkPipeline pvkCreateShadowMapGraphicsPipeline(VkDevice device, VkPip
 #ifdef PVK_IMPLEMENTATION
 PVK_LINKAGE VkPipeline pvkCreateShadowMapGraphicsPipeline(VkDevice device, VkPipelineLayout layout, VkRenderPass renderPass, uint32_t subpassIndex, uint32_t width, uint32_t height, uint32_t count, ...)
 {
+	VkVertexInputBindingDescription vertexBindingDescription = { };
+	{
+		vertexBindingDescription.binding = 0;
+		vertexBindingDescription.stride = PVK_VERTEX_SIZE;
+		vertexBindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+	};
+	VkVertexInputAttributeDescription* vertexAttributeDescriptions = PVK_NEWV(VkVertexInputAttributeDescription, PVK_VERTEX_ATTRIBUTE_COUNT);
+	vertexAttributeDescriptions[0] = __pvkGetVertexInputAttributeDescription(0, 0, VK_FORMAT_R32G32B32_SFLOAT, PVK_VERTEX_POSITION_OFFSET);
+	vertexAttributeDescriptions[1] = __pvkGetVertexInputAttributeDescription(0, 1, VK_FORMAT_R32G32B32_SFLOAT, PVK_VERTEX_NORMAL_OFFSET);
+	vertexAttributeDescriptions[2] = __pvkGetVertexInputAttributeDescription(0, 2, VK_FORMAT_R32G32_SFLOAT, PVK_VERTEX_TEXCOORD_OFFSET);
+	vertexAttributeDescriptions[3] = __pvkGetVertexInputAttributeDescription(0, 3, VK_FORMAT_R32G32B32A32_SFLOAT, PVK_VERTEX_COLOR_OFFSET);
+
 	va_list shaderModuleList;
 	va_start(shaderModuleList, count);
-	VkPipeline pipeline =  __pvkCreateGraphicsPipeline(device, layout, renderPass, subpassIndex, width, height, NULL, true, count, shaderModuleList);
+	VkPipeline pipeline =  __pvkCreateGraphicsPipeline(device, layout, renderPass, subpassIndex, width, height, 1, &vertexBindingDescription, 4, vertexAttributeDescriptions, NULL, true, count, shaderModuleList);
+	va_end(shaderModuleList);
+
+	PVK_DELETE(vertexAttributeDescriptions);
+	return pipeline;
+}
+#endif
+
+PVK_LINKAGE VkPipeline pvkCreateGraphicsPipelineProfile0(VkDevice device, VkPipelineLayout layout, VkRenderPass renderPass, uint32_t width, uint32_t height, uint32_t count, ...);
+#ifdef PVK_IMPLEMENTATION
+PVK_LINKAGE VkPipeline pvkCreateGraphicsPipelineProfile0(VkDevice device, VkPipelineLayout layout, VkRenderPass renderPass, uint32_t width, uint32_t height, uint32_t count, ...)
+{
+	va_list shaderModuleList;
+	va_start(shaderModuleList, count);
+
+	/* Color attachment configuration */
+	VkPipelineColorBlendAttachmentState colorAttachment = { };
+	{
+		colorAttachment.blendEnable = VK_FALSE;
+		colorAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+	};
+
+	VkPipelineColorBlendStateCreateInfo colorBlend = { };
+	{
+		colorBlend.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+		colorBlend.logicOpEnable = VK_FALSE;
+		colorBlend.attachmentCount = 1;
+		colorBlend.pAttachments = &colorAttachment;
+	};
+
+	VkPipeline pipeline =  __pvkCreateGraphicsPipeline(device, layout, renderPass, 0, width, height, 0, NULL, 0, NULL, &colorBlend, true, count, shaderModuleList);
 	va_end(shaderModuleList);
 	return pipeline;
 }
@@ -1772,9 +1801,22 @@ PVK_LINKAGE VkPipeline pvkCreateGraphicsPipeline(VkDevice device, VkPipelineLayo
 		colorBlend.pAttachments = colorAttachments;
 	};
 
-	VkPipeline pipeline =  __pvkCreateGraphicsPipeline(device, layout, renderPass, subpassIndex, width, height, &colorBlend, true, count, shaderModuleList);
+	VkVertexInputBindingDescription vertexBindingDescription = { };
+	{
+		vertexBindingDescription.binding = 0;
+		vertexBindingDescription.stride = PVK_VERTEX_SIZE;
+		vertexBindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+	};
+	VkVertexInputAttributeDescription* vertexAttributeDescriptions = PVK_NEWV(VkVertexInputAttributeDescription, PVK_VERTEX_ATTRIBUTE_COUNT);
+	vertexAttributeDescriptions[0] = __pvkGetVertexInputAttributeDescription(0, 0, VK_FORMAT_R32G32B32_SFLOAT, PVK_VERTEX_POSITION_OFFSET);
+	vertexAttributeDescriptions[1] = __pvkGetVertexInputAttributeDescription(0, 1, VK_FORMAT_R32G32B32_SFLOAT, PVK_VERTEX_NORMAL_OFFSET);
+	vertexAttributeDescriptions[2] = __pvkGetVertexInputAttributeDescription(0, 2, VK_FORMAT_R32G32_SFLOAT, PVK_VERTEX_TEXCOORD_OFFSET);
+	vertexAttributeDescriptions[3] = __pvkGetVertexInputAttributeDescription(0, 3, VK_FORMAT_R32G32B32A32_SFLOAT, PVK_VERTEX_COLOR_OFFSET);
+
+	VkPipeline pipeline =  __pvkCreateGraphicsPipeline(device, layout, renderPass, subpassIndex, width, height, 1, &vertexBindingDescription, 4, vertexAttributeDescriptions, &colorBlend, true, count, shaderModuleList);
 	va_end(shaderModuleList);
 	PVK_DELETE(colorAttachments);
+	PVK_DELETE(vertexAttributeDescriptions);
 	return pipeline;
 }
 #endif
