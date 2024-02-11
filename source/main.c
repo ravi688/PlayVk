@@ -1,5 +1,6 @@
 
 #define PVK_IMPLEMENTATION
+#define PVK_USE_GLFW
 #include <PlayVk/PlayVk.h>
 
 #define FENCE_WAIT_TIME 5 /* nano seconds */
@@ -32,7 +33,7 @@ static VkRenderPass pvkCreateShadowMapRenderPass(VkDevice device)
 		.colorAttachmentCount = 0
 	};
 
-	VkSubpassDependency* dependencies = newv(VkSubpassDependency, 2);
+	VkSubpassDependency* dependencies = PVK_NEWV(VkSubpassDependency, 2);
 
 	dependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
 	dependencies[0].dstSubpass = 0;
@@ -63,7 +64,7 @@ static VkRenderPass pvkCreateShadowMapRenderPass(VkDevice device)
 
 	VkRenderPass renderPass;
 	PVK_CHECK(vkCreateRenderPass(device, &cInfo, NULL, &renderPass));
-	// delete(dependencies);	
+	// PVK_DELETE(dependencies);	
 	return renderPass;
 }
 
@@ -174,13 +175,13 @@ static VkRenderPass pvkCreateRenderPass2(VkDevice device)
 		.pInputAttachments = &inputAttachmentReference2,
 		.pDepthStencilAttachment = &depthAttachmentReference
 	};		
-	VkSubpassDescription* subpasses = newv(VkSubpassDescription, 2);
+	VkSubpassDescription* subpasses = PVK_NEWV(VkSubpassDescription, 2);
 	subpasses[0] = subpass1;
 	subpasses[1] = subpass2;
 
 	VkAttachmentDescription attachments[3] = { colorAttachment2, colorAttachment1, depthAttachment };
 
-	VkSubpassDependency* dependencies = newv(VkSubpassDependency, 3);
+	VkSubpassDependency* dependencies = PVK_NEWV(VkSubpassDependency, 3);
 
 	// dependency 1
 	dependencies[0].srcSubpass = 0;
@@ -202,8 +203,8 @@ static VkRenderPass pvkCreateRenderPass2(VkDevice device)
 	};
 	VkRenderPass renderPass;
 	PVK_CHECK(vkCreateRenderPass(device, &cInfo, NULL, &renderPass));
-	delete(dependencies);
-	delete(subpasses);
+	PVK_DELETE(dependencies);
+	PVK_DELETE(subpasses);
 	return renderPass;
 }
 
@@ -253,7 +254,7 @@ static VkDescriptorSetLayout pvkCreateDescriptorSetLayout(VkDevice device)
 
 static VkDescriptorSetLayout pvkCreateGlobalDescriptorSetLayout(VkDevice device)
 {
-	VkDescriptorSetLayoutBinding* bindings = newv(VkDescriptorSetLayoutBinding, 2);
+	VkDescriptorSetLayoutBinding* bindings = PVK_NEWV(VkDescriptorSetLayoutBinding, 2);
 	bindings[0] = (VkDescriptorSetLayoutBinding)
 	{
 		.binding = 1,
@@ -271,7 +272,7 @@ static VkDescriptorSetLayout pvkCreateGlobalDescriptorSetLayout(VkDevice device)
 
 	VkDescriptorSetLayout setLayout;
 	PVK_CHECK(vkCreateDescriptorSetLayout(device, &cInfo, NULL, &setLayout));
-	delete(bindings);
+	PVK_DELETE(bindings);
 	return setLayout;
 }
 
@@ -445,8 +446,8 @@ int main()
 	pvkWriteImageViewToDescriptor(logicalGPU, set[3], 3, shadowMapAttachment, shadowMapSampler, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
 
 	PvkCamera* camera = pvkCreateCamera((float)window->width / window->height, PVK_PROJECTION_TYPE_PERSPECTIVE, 65 DEG);	
-	PvkGlobalData* globalData = new(PvkGlobalData);
-	PvkObjectData* objectData = new(PvkObjectData);
+	PvkGlobalData* globalData = PVK_NEW(PvkGlobalData);
+	PvkObjectData* objectData = PVK_NEW(PvkObjectData);
 	globalData->projectionMatrix = pvkMat4Transpose(camera->projection);
 	globalData->viewMatrix = pvkMat4Transpose(camera->view);
 	globalData->dirLight.dir = pvkVec3Normalize((PvkVec3) { 1, -1, 0 });
@@ -460,7 +461,7 @@ int main()
 	objectData->normalMatrix = pvkMat4Inverse(objectData->modelMatrix);
 	pvkUploadToMemory(logicalGPU, globalUniformBuffer.memory, globalData, sizeof(PvkGlobalData));
 	pvkUploadToMemory(logicalGPU, objectUniformBuffer.memory, objectData, sizeof(PvkObjectData));
-	delete(globalData);
+	PVK_DELETE(globalData);
 
 	/* Graphics Pipeline & Shaders */
 	VkShaderModule fragmentShader = pvkCreateShaderModule(logicalGPU, "shaders/shader.frag.spv");
@@ -486,7 +487,7 @@ int main()
 	PvkGeometry* planeGeometry = pvkCreatePlaneGeometry(physicalGPU, logicalGPU, 2, queueFamilyIndices, 6);
 	PvkGeometry* boxGeometry = pvkCreateBoxGeometry(physicalGPU, logicalGPU, 2, queueFamilyIndices, 3);
 
-	VkClearValue* clearValues = newv(VkClearValue, 3);
+	VkClearValue* clearValues = PVK_NEWV(VkClearValue, 3);
 	for(int i = 0; i < 2; i++)
 	{
 		clearValues[i].color.float32[0] = 0.1f;
@@ -536,11 +537,11 @@ int main()
 			vkDestroyPipeline(logicalGPU, pipeline2, NULL);
 			vkDestroyPipeline(logicalGPU, pipeline, NULL);
 			pvkDestroyFramebuffers(logicalGPU, 1, shadowMapFramebuffer);
-			delete(shadowMapFramebuffer);
+			PVK_DELETE(shadowMapFramebuffer);
 			vkDestroyImageView(logicalGPU, shadowMapAttachment, NULL);
 			pvkDestroyImage(logicalGPU, shadowMapImage);
 			pvkDestroyFramebuffers(logicalGPU, 3, framebuffers);
-			delete(framebuffers);
+			PVK_DELETE(framebuffers);
 			vkDestroyImageView(logicalGPU, depthAttachment, NULL);
 			pvkDestroyImage(logicalGPU, depthImage);
 			vkDestroyImageView(logicalGPU, auxAttachment, NULL);
@@ -603,9 +604,9 @@ int main()
 			shadowMapPipeline = pvkCreateShadowMapGraphicsPipeline(logicalGPU, shadowMapPipelineLayout, shadowMapRenderPass, 0, window->width, window->height, 1,
 													(PvkShader) { shadowMapVertexShader, PVK_SHADER_TYPE_VERTEX });
 
-			delete(camera);
+			PVK_DELETE(camera);
 			camera = pvkCreateCamera((float)window->width / window->height, PVK_PROJECTION_TYPE_PERSPECTIVE, 65 DEG);	
-			PvkGlobalData* globalData = new(PvkGlobalData);
+			PvkGlobalData* globalData = PVK_NEW(PvkGlobalData);
 			globalData->projectionMatrix = pvkMat4Transpose(camera->projection);
 			globalData->viewMatrix = pvkMat4Transpose(camera->view);
 			globalData->dirLight.dir = pvkVec3Normalize((PvkVec3) { 1, -1, 0 });
@@ -619,7 +620,7 @@ int main()
 			objectData->normalMatrix = pvkMat4Inverse(objectData->modelMatrix);
 			pvkUploadToMemory(logicalGPU, globalUniformBuffer.memory, globalData, sizeof(PvkGlobalData));
 			pvkUploadToMemory(logicalGPU, objectUniformBuffer.memory, objectData, sizeof(PvkObjectData));
-			delete(globalData);
+			PVK_DELETE(globalData);
 
 			pvkWriteImageViewToDescriptor(logicalGPU, set[0], 0, auxAttachment, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT);
 			pvkWriteImageViewToDescriptor(logicalGPU, set[3], 3, shadowMapAttachment, shadowMapSampler, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
@@ -659,11 +660,11 @@ int main()
 			vkDestroyPipeline(logicalGPU, pipeline2, NULL);
 			vkDestroyPipeline(logicalGPU, pipeline, NULL);
 			pvkDestroyFramebuffers(logicalGPU, 1, shadowMapFramebuffer);
-			delete(shadowMapFramebuffer);
+			PVK_DELETE(shadowMapFramebuffer);
 			vkDestroyImageView(logicalGPU, shadowMapAttachment, NULL);
 			pvkDestroyImage(logicalGPU, shadowMapImage);
 			pvkDestroyFramebuffers(logicalGPU, 3, framebuffers);
-			delete(framebuffers);
+			PVK_DELETE(framebuffers);
 			vkDestroyImageView(logicalGPU, depthAttachment, NULL);
 			pvkDestroyImage(logicalGPU, depthImage);
 			vkDestroyImageView(logicalGPU, auxAttachment, NULL);
@@ -725,9 +726,9 @@ int main()
 			shadowMapPipeline = pvkCreateShadowMapGraphicsPipeline(logicalGPU, shadowMapPipelineLayout, shadowMapRenderPass, 0, window->width, window->height, 1,
 													(PvkShader) { shadowMapVertexShader, PVK_SHADER_TYPE_VERTEX });
 
-			delete(camera);
+			PVK_DELETE(camera);
 			camera = pvkCreateCamera((float)window->width / window->height, PVK_PROJECTION_TYPE_PERSPECTIVE, 65 DEG);	
-			PvkGlobalData* globalData = new(PvkGlobalData);
+			PvkGlobalData* globalData = PVK_NEW(PvkGlobalData);
 			globalData->projectionMatrix = pvkMat4Transpose(camera->projection);
 			globalData->viewMatrix = pvkMat4Transpose(camera->view);
 			globalData->dirLight.dir = pvkVec3Normalize((PvkVec3) { 1, -1, 0 });
@@ -741,7 +742,7 @@ int main()
 			objectData->normalMatrix = pvkMat4Inverse(objectData->modelMatrix);
 			pvkUploadToMemory(logicalGPU, globalUniformBuffer.memory, globalData, sizeof(PvkGlobalData));
 			pvkUploadToMemory(logicalGPU, objectUniformBuffer.memory, objectData, sizeof(PvkObjectData));
-			delete(globalData);
+			PVK_DELETE(globalData);
 
 			pvkWriteImageViewToDescriptor(logicalGPU, set[0], 0, auxAttachment, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT);
 			pvkWriteImageViewToDescriptor(logicalGPU, set[3], 3, shadowMapAttachment, shadowMapSampler, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
@@ -771,9 +772,9 @@ int main()
 
 	pvkDestroyFencePool(logicalGPU, fencePool);
 	pvkDestroySemaphoreCircularPool(logicalGPU, semaphorePool);
-	delete(clearValues);
-	delete(objectData);
-	delete(camera);
+	PVK_DELETE(clearValues);
+	PVK_DELETE(objectData);
+	PVK_DELETE(camera);
 	pvkDestroyGeometry(logicalGPU, planeGeometry);
 	pvkDestroyGeometry(logicalGPU, boxGeometry);
 	vkDestroyShaderModule(logicalGPU, shadowMapFragmentShader, NULL);
@@ -788,19 +789,19 @@ int main()
 	vkDestroyPipelineLayout(logicalGPU, pipelineLayout, NULL);
 	vkDestroyShaderModule(logicalGPU, fragmentShader, NULL);
 	vkDestroyShaderModule(logicalGPU, vertexShader, NULL);
-	delete(set);
+	PVK_DELETE(set);
 	for(int i = 0; i < 4; i++)
 		vkDestroyDescriptorSetLayout(logicalGPU, setLayouts[i], NULL);
 	pvkDestroyBuffer(logicalGPU, objectUniformBuffer);
 	pvkDestroyBuffer(logicalGPU, globalUniformBuffer);
 	vkDestroyDescriptorPool(logicalGPU, descriptorPool, NULL);
 	pvkDestroyFramebuffers(logicalGPU, 1, shadowMapFramebuffer);
-	delete(shadowMapFramebuffer);
+	PVK_DELETE(shadowMapFramebuffer);
 	vkDestroyImageView(logicalGPU, shadowMapAttachment, NULL);
 	pvkDestroyImage(logicalGPU, shadowMapImage);
 	vkDestroySampler(logicalGPU, shadowMapSampler, NULL);
 	pvkDestroyFramebuffers(logicalGPU, 3, framebuffers);
-	delete(framebuffers);
+	PVK_DELETE(framebuffers);
 	vkDestroyImageView(logicalGPU, depthAttachment, NULL);
 	pvkDestroyImage(logicalGPU, depthImage);
 	vkDestroyImageView(logicalGPU, auxAttachment, NULL);
@@ -810,7 +811,7 @@ int main()
 	vkDestroyRenderPass(logicalGPU, shadowMapRenderPass, NULL);
 	vkDestroySemaphore(logicalGPU, imageAvailableSemaphore, NULL);
 	vkDestroySemaphore(logicalGPU, renderFinishSemaphore, NULL);
-	delete(commandBuffers);
+	PVK_DELETE(commandBuffers);
 	vkDestroyCommandPool(logicalGPU, commandPool, NULL);
 	vkDestroySwapchainKHR(logicalGPU, swapchain, NULL);
 	vkDestroyDevice(logicalGPU, NULL);

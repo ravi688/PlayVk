@@ -19,6 +19,7 @@
 #define PVK_INLINE inline
 #define PVK_DEBUG
 // #define PVK_IMPLEMENTATION
+// #define PVK_USE_GLFW
 
 #if defined(__cplusplus) && (__cplusplus >= 201103L)
 #	define PVK_CONSTEXPR constexpr
@@ -43,21 +44,21 @@
 extern "C" {
 #endif
 
-#define new(type) (type*)__new(sizeof(type))
-#define newv(type, count) (type*)__new(sizeof(type) * count)
-PVK_LINKAGE void* __new(size_t size);
+#define PVK_NEW(type) (type*)__PVK_NEW(sizeof(type))
+#define PVK_NEWV(type, count) (type*)__PVK_NEW(sizeof(type) * count)
+PVK_LINKAGE void* __PVK_NEW(size_t size);
 #ifdef PVK_IMPLEMENTATION
-PVK_LINKAGE void* __new(size_t size)
+PVK_LINKAGE void* __PVK_NEW(size_t size)
 { 
 	void* block = PVK_MALLOC(size); 
 	PVK_MEMSET(block, 0, size); 
 	return block; 
 }
 #endif
-#define delete(ptr) __delete((char**)&(ptr))
-PVK_LINKAGE void __delete(char** ptr);
+#define PVK_DELETE(ptr) __PVK_DELETE((char**)&(ptr))
+PVK_LINKAGE void __PVK_DELETE(char** ptr);
 #ifdef PVK_IMPLEMENTATION 
-PVK_LINKAGE void __delete(char** ptr) 
+PVK_LINKAGE void __PVK_DELETE(char** ptr) 
 { 
 	if(*ptr == NULL) {  PVK_WARNING("You are trying to free an invalid memory block, ptr = NULL"); return;  }
 	PVK_FREE((void*)(*ptr)); 
@@ -391,6 +392,7 @@ PVK_LINKAGE void pvkCheckResult(VkResult result, uint32_t line_no, const char* f
 }
 #endif
 
+#ifdef PVK_USE_GLFW
 /* Windowing system */
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -427,7 +429,7 @@ PVK_LINKAGE PvkWindow* pvkWindowCreate(uint32_t width, uint32_t height, const ch
 #ifdef PVK_IMPLEMENTATION
 PVK_LINKAGE PvkWindow* pvkWindowCreate(uint32_t width, uint32_t height, const char* title, bool full_screen, bool resizable)
 {
-	PvkWindow* window = new(PvkWindow);
+	PvkWindow* window = PVK_NEW(PvkWindow);
 	glfwInit();
 #ifdef PVK_DEBUG
 	glfwSetErrorCallback(glfwErrorCallback);
@@ -459,7 +461,7 @@ PVK_LINKAGE void pvkWindowDestroy(PvkWindow* window)
 {
 	glfwDestroyWindow((GLFWwindow*)window->handle);
 	glfwTerminate();
-	delete(window);
+	PVK_DELETE(window);
 }
 #endif
 
@@ -477,7 +479,7 @@ PVK_LINKAGE VkSurfaceKHR pvkWindowCreateVulkanSurface(PvkWindow* window, VkInsta
 	return surface;
 }
 #endif
-
+#endif  /* ifdef PVK_USE_GLFW */
 
 /* Vulkan */
 
@@ -495,7 +497,7 @@ PVK_LINKAGE void __pvkCheckForInstanceExtensionSupport(uint32_t count, const cha
 {
 	uint32_t supportedCount;
 	PVK_CHECK(vkEnumerateInstanceExtensionProperties(NULL, &supportedCount, NULL));
-	VkExtensionProperties* supportedExtensions = newv(VkExtensionProperties, supportedCount);
+	VkExtensionProperties* supportedExtensions = PVK_NEWV(VkExtensionProperties, supportedCount);
 	PVK_CHECK(vkEnumerateInstanceExtensionProperties(NULL, &supportedCount, supportedExtensions));
 
 	for(uint32_t i = 0; i < count; i++)
@@ -512,7 +514,7 @@ PVK_LINKAGE void __pvkCheckForInstanceExtensionSupport(uint32_t count, const cha
 		if(!found)
 			PVK_FETAL_ERROR("Extension \"%s\" isn't supported by the vulkan implementation", extensions[i]);
 	}
-	delete(supportedExtensions);
+	PVK_DELETE(supportedExtensions);
 }
 #endif
 
@@ -602,7 +604,7 @@ PVK_LINKAGE bool __pvkIsPresentModeSupported(VkPhysicalDevice device, VkSurfaceK
 {
 	uint32_t presentModeCount;
 	PVK_CHECK(vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentModeCount, NULL));
-	VkPresentModeKHR* presentModes = newv(VkPresentModeKHR, presentModeCount);
+	VkPresentModeKHR* presentModes = PVK_NEWV(VkPresentModeKHR, presentModeCount);
 	PVK_CHECK(vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentModeCount, presentModes));
 
 	bool isPresentModeSupported = false;
@@ -612,7 +614,7 @@ PVK_LINKAGE bool __pvkIsPresentModeSupported(VkPhysicalDevice device, VkSurfaceK
 			isPresentModeSupported = true;
 			break;
 		}
-	delete(presentModes);
+	PVK_DELETE(presentModes);
 	if(!isPresentModeSupported)
 		PVK_WARNING("Requested present mode is not supported");
 	return isPresentModeSupported;
@@ -625,7 +627,7 @@ PVK_LINKAGE bool __pvkIsSurfaceFormatSupported(VkPhysicalDevice device, VkSurfac
 {
 	uint32_t formatCount;
 	PVK_CHECK(vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount, NULL));
-	VkSurfaceFormatKHR* formats = newv(VkSurfaceFormatKHR, formatCount);
+	VkSurfaceFormatKHR* formats = PVK_NEWV(VkSurfaceFormatKHR, formatCount);
 	PVK_CHECK(vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount, formats));
 
 	bool isFormatSupported = false;
@@ -635,7 +637,7 @@ PVK_LINKAGE bool __pvkIsSurfaceFormatSupported(VkPhysicalDevice device, VkSurfac
 			isFormatSupported = true;
 			break;
 		}
-	delete(formats);
+	PVK_DELETE(formats);
 	if(!isFormatSupported)
 		PVK_WARNING("Requested surface format is not supported");
 	return isFormatSupported;
@@ -710,9 +712,12 @@ PVK_LINKAGE VkPhysicalDevice pvkGetPhysicalDevice(VkInstance instance, VkSurface
 											VkColorSpaceKHR colorSpace, 
 											VkPresentModeKHR presentMode)
 {
-	uint32_t deviceCount;
-	PVK_CHECK(vkEnumeratePhysicalDevices(instance, &deviceCount, NULL));
-	VkPhysicalDevice* devices = newv(VkPhysicalDevice, deviceCount);
+	uint32_t deviceCount = 0;
+	VkResult result = vkEnumeratePhysicalDevices(instance, &deviceCount, NULL);
+	if(result == VK_INCOMPLETE)
+		PVK_FETAL_ERROR("No Vulkan Compatible Device is found. Exiting...");
+	else PVK_CHECK(result);
+	VkPhysicalDevice* devices = PVK_NEWV(VkPhysicalDevice, deviceCount);
 	PVK_CHECK(vkEnumeratePhysicalDevices(instance, &deviceCount, devices));
 
 	VkPhysicalDevice device = VK_NULL_HANDLE, fallbackDevice = VK_NULL_HANDLE;
@@ -754,7 +759,7 @@ PVK_LINKAGE VkPhysicalDevice pvkGetPhysicalDevice(VkInstance instance, VkSurface
 	strcpy(selectedGPUName, properties.deviceName);
 	PVK_INFO("Selected physical device: %s", selectedGPUName);
 
-	delete(devices);
+	PVK_DELETE(devices);
 	return device;
 }
 #endif
@@ -765,7 +770,7 @@ PVK_LINKAGE uint32_t pvkFindQueueFamilyIndex(VkPhysicalDevice device, VkQueueFla
 {
 	uint32_t count;
 	vkGetPhysicalDeviceQueueFamilyProperties(device, &count, NULL);
-	VkQueueFamilyProperties* properties = newv(VkQueueFamilyProperties, count);
+	VkQueueFamilyProperties* properties = PVK_NEWV(VkQueueFamilyProperties, count);
 	vkGetPhysicalDeviceQueueFamilyProperties(device, &count, properties);
 
 	uint32_t index = UINT32_MAX;
@@ -775,7 +780,7 @@ PVK_LINKAGE uint32_t pvkFindQueueFamilyIndex(VkPhysicalDevice device, VkQueueFla
 			index = i;
 			break;
 		}
-	delete(properties);
+	PVK_DELETE(properties);
 
 	if(index == UINT32_MAX)
 		PVK_WARNING("Unable to find Queue Family with the requested QueueFlags");
@@ -845,7 +850,7 @@ PVK_LINKAGE VkDevice pvkCreateLogicalDeviceWithExtensions(VkInstance instance, V
 	__pvkUnionUInt32(queueFamilyCount, queueFamilyIndices, &uniqueQueueFamilyCount, uniqueQueueFamilyIndices);
 
 	float queuePriority = 1.0f;
-	VkDeviceQueueCreateInfo* queueCreateInfos = newv(VkDeviceQueueCreateInfo, uniqueQueueFamilyCount);
+	VkDeviceQueueCreateInfo* queueCreateInfos = PVK_NEWV(VkDeviceQueueCreateInfo, uniqueQueueFamilyCount);
 	
 	for(int i = 0; i < uniqueQueueFamilyCount; i++)
 	{
@@ -869,7 +874,7 @@ PVK_LINKAGE VkDevice pvkCreateLogicalDeviceWithExtensions(VkInstance instance, V
 	// check for device extension support
 	uint32_t supportedExtensionCount;
 	PVK_CHECK(vkEnumerateDeviceExtensionProperties(physicalDevice, NULL, &supportedExtensionCount, NULL));
-	VkExtensionProperties* supportedExtensions = newv(VkExtensionProperties, supportedExtensionCount);
+	VkExtensionProperties* supportedExtensions = PVK_NEWV(VkExtensionProperties, supportedExtensionCount);
 	PVK_CHECK(vkEnumerateDeviceExtensionProperties(physicalDevice, NULL, &supportedExtensionCount, supportedExtensions));
 
 	for(uint32_t i = 0; i < extensionCount; i++)
@@ -886,7 +891,7 @@ PVK_LINKAGE VkDevice pvkCreateLogicalDeviceWithExtensions(VkInstance instance, V
 		if(!found)
 			PVK_FETAL_ERROR("Extension \"%s\" isn't supported by the vulkan physical device", extensions[i]);
 	}
-	delete(supportedExtensions);
+	PVK_DELETE(supportedExtensions);
 
 	// TODO: make features configurable
 	VkPhysicalDeviceFeatures features = { };
@@ -902,7 +907,7 @@ PVK_LINKAGE VkDevice pvkCreateLogicalDeviceWithExtensions(VkInstance instance, V
 	};
 	VkDevice device;
 	PVK_CHECK(vkCreateDevice(physicalDevice, &dcInfo, NULL, &device));
-	delete(queueCreateInfos);
+	PVK_DELETE(queueCreateInfos);
 	return device;
 }
 #endif
@@ -976,7 +981,7 @@ PVK_LINKAGE VkCommandBuffer* __pvkAllocateCommandBuffers(VkDevice device, VkComm
 		info.commandBufferCount = count;
 	};
 
-	VkCommandBuffer* commandBuffers = newv(VkCommandBuffer, count);
+	VkCommandBuffer* commandBuffers = PVK_NEWV(VkCommandBuffer, count);
 	PVK_CHECK(vkAllocateCommandBuffers(device, &info, commandBuffers));
 	return commandBuffers;
 }
@@ -1404,14 +1409,14 @@ PVK_LINKAGE VkImageView* pvkCreateSwapchainImageViews(VkDevice device, VkSwapcha
 	uint32_t imageCount;
 	PVK_CHECK(vkGetSwapchainImagesKHR(device, swapchain, &imageCount, NULL));
 	PVK_ASSERT(imageCount == 3);
-	VkImage* images = newv(VkImage, imageCount);
+	VkImage* images = PVK_NEWV(VkImage, imageCount);
 	PVK_CHECK(vkGetSwapchainImagesKHR(device, swapchain, &imageCount, images));
 
-	VkImageView* imageViews = newv(VkImageView, imageCount);
+	VkImageView* imageViews = PVK_NEWV(VkImageView, imageCount);
 	for(int i = 0; i < imageCount; i++)
 		imageViews[i] = pvkCreateImageView(device, images[i], format, VK_IMAGE_ASPECT_COLOR_BIT);
 
-	delete(images);
+	PVK_DELETE(images);
 	return imageViews;
 }
 #endif
@@ -1424,7 +1429,7 @@ PVK_LINKAGE void pvkDestroySwapchainImageViews(VkDevice device, VkSwapchainKHR s
 	PVK_CHECK(vkGetSwapchainImagesKHR(device, swapchain, &imageCount, NULL));
 	for(int i = 0; i < imageCount; i++)
 		vkDestroyImageView(device, imageViews[i], NULL);
-	delete(imageViews);
+	PVK_DELETE(imageViews);
 }
 #endif
 
@@ -1433,7 +1438,7 @@ PVK_LINKAGE VkFramebuffer* pvkCreateFramebuffers(VkDevice device, VkRenderPass r
 #ifdef PVK_IMPLEMENTATION
 PVK_LINKAGE VkFramebuffer* pvkCreateFramebuffers(VkDevice device, VkRenderPass renderPass, uint32_t width, uint32_t height, uint32_t fbCount, uint32_t attachmentCount, VkImageView* imageViews)
 {
-	VkFramebuffer* framebuffers = newv(VkFramebuffer, fbCount);
+	VkFramebuffer* framebuffers = PVK_NEWV(VkFramebuffer, fbCount);
 	for(int i = 0; i < fbCount; i++)
 	{
 		VkFramebufferCreateInfo fInfo = { };
@@ -1475,7 +1480,7 @@ PVK_LINKAGE const char* __pvkLoadBinaryFile(const char* filePath, size_t* out_le
 	if(length == 0)
 		PVK_WARNING("File at path \"%s\" is empty", filePath);
 	rewind(file);
-	char* data = newv(char, length);
+	char* data = PVK_NEWV(char, length);
 	size_t readLength = fread(data, 1, length, file);
 	PVK_ASSERT(readLength == length);
 	fclose(file);
@@ -1500,7 +1505,7 @@ PVK_LINKAGE VkShaderModule pvkCreateShaderModule(VkDevice device, const char* fi
 	};
 	VkShaderModule shaderModule;
 	PVK_CHECK(vkCreateShaderModule(device, &cInfo, NULL, &shaderModule));
-	delete(bytes);
+	PVK_DELETE(bytes);
 	return shaderModule;
 }
 #endif
@@ -1532,7 +1537,7 @@ PVK_LINKAGE VkPipelineShaderStageCreateInfo* __pvkCreatePipelineShaderStageCreat
 #ifdef PVK_IMPLEMENTATION
 PVK_LINKAGE VkPipelineShaderStageCreateInfo* __pvkCreatePipelineShaderStageCreateInfos(uint32_t count, const PvkShader* const shaders)
 {
-	VkPipelineShaderStageCreateInfo* infos = newv(VkPipelineShaderStageCreateInfo, count);
+	VkPipelineShaderStageCreateInfo* infos = PVK_NEWV(VkPipelineShaderStageCreateInfo, count);
 	for(int i = 0; i < count; i++)
 	{
 		infos[i] = (VkPipelineShaderStageCreateInfo) { };
@@ -1599,7 +1604,7 @@ PVK_LINKAGE VkPipeline __pvkCreateGraphicsPipeline(VkDevice device, VkPipelineLa
 		vertexBindingDescription.stride = PVK_VERTEX_SIZE;
 		vertexBindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 	};
-	VkVertexInputAttributeDescription* vertexAttributeDescriptions = newv(VkVertexInputAttributeDescription, PVK_VERTEX_ATTRIBUTE_COUNT);
+	VkVertexInputAttributeDescription* vertexAttributeDescriptions = PVK_NEWV(VkVertexInputAttributeDescription, PVK_VERTEX_ATTRIBUTE_COUNT);
 	vertexAttributeDescriptions[0] = __pvkGetVertexInputAttributeDescription(0, 0, VK_FORMAT_R32G32B32_SFLOAT, PVK_VERTEX_POSITION_OFFSET);
 	vertexAttributeDescriptions[1] = __pvkGetVertexInputAttributeDescription(0, 1, VK_FORMAT_R32G32B32_SFLOAT, PVK_VERTEX_NORMAL_OFFSET);
 	vertexAttributeDescriptions[2] = __pvkGetVertexInputAttributeDescription(0, 2, VK_FORMAT_R32G32_SFLOAT, PVK_VERTEX_TEXCOORD_OFFSET);
@@ -1698,8 +1703,8 @@ PVK_LINKAGE VkPipeline __pvkCreateGraphicsPipeline(VkDevice device, VkPipelineLa
 	VkPipeline pipeline;
 	PVK_CHECK(vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineCInfo, NULL, &pipeline));
 
-	delete(stageCInfos);
-	delete(vertexAttributeDescriptions);
+	PVK_DELETE(stageCInfos);
+	PVK_DELETE(vertexAttributeDescriptions);
 	return pipeline;
 }
 #endif
@@ -1724,7 +1729,7 @@ PVK_LINKAGE VkPipeline pvkCreateGraphicsPipeline(VkDevice device, VkPipelineLayo
 	va_start(shaderModuleList, count);
 
 	/* Color attachment configuration */
-	VkPipelineColorBlendAttachmentState* colorAttachments = newv(VkPipelineColorBlendAttachmentState, colorAttachmentCount);
+	VkPipelineColorBlendAttachmentState* colorAttachments = PVK_NEWV(VkPipelineColorBlendAttachmentState, colorAttachmentCount);
 	for(uint32_t i = 0; i < colorAttachmentCount; i++)
 	{
 		VkPipelineColorBlendAttachmentState colorAttachment = { };
@@ -1745,7 +1750,7 @@ PVK_LINKAGE VkPipeline pvkCreateGraphicsPipeline(VkDevice device, VkPipelineLayo
 
 	VkPipeline pipeline =  __pvkCreateGraphicsPipeline(device, layout, renderPass, subpassIndex, width, height, &colorBlend, true, count, shaderModuleList);
 	va_end(shaderModuleList);
-	delete(colorAttachments);
+	PVK_DELETE(colorAttachments);
 	return pipeline;
 }
 #endif
@@ -1848,7 +1853,7 @@ PVK_LINKAGE VkDescriptorSet* pvkAllocateDescriptorSets(VkDevice device, VkDescri
 		allocInfo.pSetLayouts = setLayouts;
 	};
 
-	VkDescriptorSet* sets = newv(VkDescriptorSet, setCount);
+	VkDescriptorSet* sets = PVK_NEWV(VkDescriptorSet, setCount);
 	PVK_CHECK(vkAllocateDescriptorSets(device, &allocInfo, sets));
 	return sets;
 }
@@ -1969,7 +1974,7 @@ PVK_LINKAGE PvkGeometry* __pvkCreateGeometry(VkPhysicalDevice physicalDevice, Vk
 												VK_BUFFER_USAGE_INDEX_BUFFER_BIT, indexBufferSize, queueFamilyIndexCount, queueFamilyIndices);
 	pvkUploadToMemory(device, vertexBuffer.memory, data->vertices, vertexBufferSize);
 	pvkUploadToMemory(device, indexBuffer.memory, data->indices, indexBufferSize);
-	PvkGeometry* geometry = new(PvkGeometry);
+	PvkGeometry* geometry = PVK_NEW(PvkGeometry);
 	geometry->vertexBuffer = vertexBuffer;
 	geometry->indexBuffer = indexBuffer;
 	geometry->indexCount = data->indexCount;
@@ -2093,7 +2098,7 @@ PVK_LINKAGE void pvkDestroyGeometry(VkDevice device, PvkGeometry* geometry)
 {
 	pvkDestroyBuffer(device, geometry->vertexBuffer);
 	pvkDestroyBuffer(device, geometry->indexBuffer);
-	delete(geometry);
+	PVK_DELETE(geometry);
 }
 #endif
 
@@ -2149,7 +2154,7 @@ PVK_LINKAGE PvkCamera* pvkCreateCamera(float aspectRatio, PvkProjectionType proj
 #ifdef PVK_IMPLEMENTATION
 PVK_LINKAGE PvkCamera* pvkCreateCamera(float aspectRatio, PvkProjectionType projectionType, float heightOrAngle)
 {
-	PvkCamera* cam = new(PvkCamera);
+	PvkCamera* cam = PVK_NEW(PvkCamera);
 	cam->transform = pvkMat4Mul(pvkMat4Translate((PvkVec3) { 0, 2.0f, 6.0f }), pvkMat4Rotate((PvkVec3) { -20 PVK_DEG, 0, 0 }));
 	cam->view = pvkMat4Inverse(cam->transform);
 	switch(projectionType)
