@@ -5,21 +5,24 @@
 #include <PlayVk/assert.h>
 #include <PlayVk/debug.h>
 
-#include <vulkan/vulkan.h> 	// for vulkan
-
-#include <stdio.h> 			// printf, puts, fopen, fclose
-#include <stdlib.h> 		// malloc
-#include <string.h> 		// memset
-#include <math.h> 			// sin, cos
-
-
-/* Configuration */
+/* <begin> Configuration Switches */
 #define PVK_STATIC static
 #define PVK_LINKAGE extern
 #define PVK_INLINE inline
 #define PVK_DEBUG
 // #define PVK_IMPLEMENTATION
 // #define PVK_USE_GLFW
+/* <end> Configuration Switches */
+
+#ifdef PVK_USE_WIN32_SURFACE
+#	define VK_USE_PLATFORM_WIN32_KHR
+#endif
+#include <vulkan/vulkan.h> 	// for vulkan
+
+#include <stdio.h> 			// printf, puts, fopen, fclose
+#include <stdlib.h> 		// malloc
+#include <string.h> 		// memset
+#include <math.h> 			// sin, cos
 
 #if defined(__cplusplus) && (__cplusplus >= 201103L)
 #	define PVK_CONSTEXPR constexpr
@@ -704,13 +707,15 @@ PVK_LINKAGE VkPhysicalDevice pvkGetPhysicalDevice(VkInstance instance, VkSurface
 											VkPhysicalDeviceType gpuType, 
 											VkFormat format, 
 											VkColorSpaceKHR colorSpace, 
-											VkPresentModeKHR presentMode);
+											VkPresentModeKHR presentMode,
+											uint32_t imageCount);
 #ifdef PVK_IMPLEMENTATION
 PVK_LINKAGE VkPhysicalDevice pvkGetPhysicalDevice(VkInstance instance, VkSurfaceKHR surface, 
 											VkPhysicalDeviceType gpuType, 
 											VkFormat format, 
 											VkColorSpaceKHR colorSpace, 
-											VkPresentModeKHR presentMode)
+											VkPresentModeKHR presentMode,
+											uint32_t imageCount)
 {
 	uint32_t deviceCount = 0;
 	VkResult result = vkEnumeratePhysicalDevices(instance, &deviceCount, NULL);
@@ -732,7 +737,7 @@ PVK_LINKAGE VkPhysicalDevice pvkGetPhysicalDevice(VkInstance instance, VkSurface
 			requirements.colorSpace = colorSpace;
 			requirements.presentMode = presentMode;
 			requirements.shaders = (PvkShaderFlags)(PVK_SHADER_TYPE_GEOMETRY | PVK_SHADER_TYPE_TESSELLATION);
-			requirements.imageCount = 3;
+			requirements.imageCount = imageCount;
 			// .imageWidth = 800,
 			// .imageHeight = 800
 		};
@@ -912,12 +917,30 @@ PVK_LINKAGE VkDevice pvkCreateLogicalDeviceWithExtensions(VkInstance instance, V
 }
 #endif
 
-PVK_LINKAGE VkSwapchainKHR pvkCreateSwapchain(VkDevice device, VkSurfaceKHR surface, 
+#ifdef PVK_USE_WIN32_SURFACE
+PVK_LINKAGE VkSurfaceKHR pvkCreateSurface(VkInstance vkInstance, HINSTANCE instance, HWND handle);
+#ifdef PVK_IMPLEMENTATION
+PVK_LINKAGE VkSurfaceKHR pvkCreateSurface(VkInstance vkInstance, HINSTANCE instance, HWND handle)
+{
+	VkWin32SurfaceCreateInfoKHR createInfo = { };
+	createInfo.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
+	createInfo.pNext = NULL;
+	createInfo.flags = 0;
+	createInfo.hinstance = instance;
+	createInfo.hwnd = handle;
+	VkSurfaceKHR surface;
+    PVK_CHECK(vkCreateWin32SurfaceKHR(vkInstance, &createInfo, NULL, &surface));
+    return surface;
+}
+#endif
+#endif /* if PVK_USE_WIN32_SURFACE */
+
+PVK_LINKAGE VkSwapchainKHR pvkCreateSwapchain(VkDevice device, VkSurfaceKHR surface, uint32_t minImageCount,
 											uint32_t width, uint32_t height, 
 											VkFormat format, VkColorSpaceKHR colorSpace, VkPresentModeKHR presentMode,
 											uint32_t queueFamilyCount, uint32_t* queueFamilyIndices, VkSwapchainKHR oldSwapchain);
 #ifdef PVK_IMPLEMENTATION
-PVK_LINKAGE VkSwapchainKHR pvkCreateSwapchain(VkDevice device, VkSurfaceKHR surface, 
+PVK_LINKAGE VkSwapchainKHR pvkCreateSwapchain(VkDevice device, VkSurfaceKHR surface, uint32_t minImageCount,
 											uint32_t width, uint32_t height, 
 											VkFormat format, VkColorSpaceKHR colorSpace, VkPresentModeKHR presentMode,
 											uint32_t queueFamilyCount, uint32_t* queueFamilyIndices, VkSwapchainKHR oldSwapchain)
@@ -931,7 +954,7 @@ PVK_LINKAGE VkSwapchainKHR pvkCreateSwapchain(VkDevice device, VkSurfaceKHR surf
 	{
 		scInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
 		scInfo.surface = surface;
-		scInfo.minImageCount = 3;
+		scInfo.minImageCount = minImageCount;
 		scInfo.imageFormat = format;
 		scInfo.imageColorSpace = colorSpace;
 		scInfo.imageExtent = (VkExtent2D) { width, height };
@@ -1401,14 +1424,15 @@ PVK_LINKAGE VkImageView pvkCreateImageView(VkDevice device, VkImage image, VkFor
 }
 #endif
 
-PVK_LINKAGE VkImageView* pvkCreateSwapchainImageViews(VkDevice device, VkSwapchainKHR swapchain, VkFormat format);
+PVK_LINKAGE VkImageView* pvkCreateSwapchainImageViews(VkDevice device, VkSwapchainKHR swapchain, VkFormat format, uint32_t* outImageCount);
 #ifdef PVK_IMPLEMENTATION
-PVK_LINKAGE VkImageView* pvkCreateSwapchainImageViews(VkDevice device, VkSwapchainKHR swapchain, VkFormat format)
+PVK_LINKAGE VkImageView* pvkCreateSwapchainImageViews(VkDevice device, VkSwapchainKHR swapchain, VkFormat format, uint32_t* outImageCount)
 {
 	// get the swapchain images
 	uint32_t imageCount;
 	PVK_CHECK(vkGetSwapchainImagesKHR(device, swapchain, &imageCount, NULL));
-	PVK_ASSERT(imageCount == 3);
+	if(outImageCount != NULL)
+		*outImageCount = imageCount;
 	VkImage* images = PVK_NEWV(VkImage, imageCount);
 	PVK_CHECK(vkGetSwapchainImagesKHR(device, swapchain, &imageCount, images));
 
