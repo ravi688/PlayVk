@@ -1097,7 +1097,9 @@ PVK_LINKAGE void pvkResetFences(VkDevice device, uint32_t fenceCount, VkFence* f
 #ifdef PVK_IMPLEMENTATION
 PVK_LINKAGE void pvkResetFences(VkDevice device, uint32_t fenceCount, VkFence* fences)
 {
-	PVK_CHECK(vkWaitForFences(device, fenceCount, fences, VK_TRUE, 0));
+	VkResult result = vkWaitForFences(device, fenceCount, fences, VK_TRUE, 0);
+	if(result != VK_TIMEOUT)
+		PVK_CHECK(result);
 	PVK_CHECK(vkResetFences(device, fenceCount, fences));
 }
 #endif
