@@ -653,7 +653,7 @@ int main()
 		pvkSubmit(commandBuffers[index], graphicsQueue, imageAvailableSemaphore, renderFinishSemaphore, VK_NULL_HANDLE);
 
 		// present the output image
-		if(!pvkPresent(index, swapchain, presentQueue, renderFinishSemaphore))
+		if(!pvkPresent(index, swapchain, presentQueue, 1, &renderFinishSemaphore))
 		{
 			PVK_CHECK(vkDeviceWaitIdle(logicalGPU));
 			vkDestroyPipeline(logicalGPU, shadowMapPipeline, NULL);

@@ -1190,16 +1190,16 @@ PVK_LINKAGE bool pvkAcquireNextImageKHR(VkDevice device, VkSwapchainKHR swapchai
 }
 #endif
 
-PVK_LINKAGE bool pvkPresent(uint32_t index, VkSwapchainKHR  swapchain, VkQueue queue, VkSemaphore wait);
+PVK_LINKAGE bool pvkPresent(uint32_t index, VkSwapchainKHR  swapchain, VkQueue queue, uint32_t waitCount, VkSemaphore* waits);
 #ifdef PVK_IMPLEMENTATION
-PVK_LINKAGE bool pvkPresent(uint32_t index, VkSwapchainKHR  swapchain, VkQueue queue, VkSemaphore wait)
+PVK_LINKAGE bool pvkPresent(uint32_t index, VkSwapchainKHR  swapchain, VkQueue queue, uint32_t waitCount, VkSemaphore* waits)
 {
 	VkResult result;
 	VkPresentInfoKHR info = { };
 	{
 		info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-		info.waitSemaphoreCount = 1;
-		info.pWaitSemaphores = &wait;
+		info.waitSemaphoreCount = waitCount;
+		info.pWaitSemaphores = waits;
 		info.swapchainCount = 1;
 		info.pSwapchains = &swapchain;
 		info.pImageIndices = &index;
