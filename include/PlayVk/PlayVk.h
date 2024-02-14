@@ -598,6 +598,7 @@ typedef struct PvkPhysicalDeviceRequirements
 	uint32_t imageCount; 			// image count in the swapchain
 	uint32_t imageWidth;			// image width in the swapchain
 	uint32_t imageHeight;			// image height in the swapchain
+	bool samplerYcbcrConversion; 	// samplerYcbcrConversion feature enable
 } PvkPhysicalDeviceRequirements;
 
 
@@ -658,18 +659,26 @@ PVK_LINKAGE bool __pvkIsDeviceTypeSupported(VkPhysicalDevice device, VkPhysicalD
 }
 #endif
 
-PVK_LINKAGE bool __pvkIsDeviceFeaturesSupported(VkPhysicalDevice device, VkPhysicalDeviceFeatures* requiredFeatures);
+PVK_LINKAGE bool __pvkIsDeviceFeaturesSupported(VkPhysicalDevice device, VkPhysicalDeviceFeatures2* requiredFeatures2);
 #ifdef PVK_IMPLEMENTATION
-PVK_LINKAGE bool __pvkIsDeviceFeaturesSupported(VkPhysicalDevice device, VkPhysicalDeviceFeatures* requiredFeatures)
+PVK_LINKAGE bool __pvkIsDeviceFeaturesSupported(VkPhysicalDevice device, VkPhysicalDeviceFeatures2* requiredFeatures2)
 {
-	VkPhysicalDeviceFeatures features;
-	vkGetPhysicalDeviceFeatures(device, &features);
+	VkPhysicalDeviceSamplerYcbcrConversionFeatures conversionFeatures = { };
+	conversionFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SAMPLER_YCBCR_CONVERSION_FEATURES;
+	VkPhysicalDeviceFeatures2 features2 = { };
+	features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+	if(requiredFeatures2->pNext != NULL)
+		features2.pNext = &conversionFeatures;
+	vkGetPhysicalDeviceFeatures2(device, &features2);
+	VkPhysicalDeviceFeatures* requiredFeatures = &requiredFeatures2->features;
+	VkPhysicalDeviceFeatures* features = &features2.features;
 
 	bool isSupported = true;
-	isSupported &= requiredFeatures->geometryShader? (features.geometryShader && requiredFeatures->geometryShader) : true;
-	isSupported &= requiredFeatures->tessellationShader? (features.tessellationShader && requiredFeatures->tessellationShader) : true;
-	isSupported &= requiredFeatures->samplerAnisotropy? (features.samplerAnisotropy == requiredFeatures->samplerAnisotropy) : true;
-	isSupported &= requiredFeatures->textureCompressionETC2? (features.textureCompressionETC2 == requiredFeatures->textureCompressionETC2) : true;
+	isSupported &= requiredFeatures->geometryShader? (features->geometryShader && requiredFeatures->geometryShader) : true;
+	isSupported &= requiredFeatures->tessellationShader? (features->tessellationShader && requiredFeatures->tessellationShader) : true;
+	isSupported &= requiredFeatures->samplerAnisotropy? (features->samplerAnisotropy == requiredFeatures->samplerAnisotropy) : true;
+	isSupported &= requiredFeatures->textureCompressionETC2? (features->textureCompressionETC2 == requiredFeatures->textureCompressionETC2) : true;
+	isSupported	&= (requiredFeatures2->pNext != NULL) ? (reinterpret_cast<VkPhysicalDeviceSamplerYcbcrConversionFeatures*>(requiredFeatures2->pNext)->samplerYcbcrConversion == conversionFeatures.samplerYcbcrConversion) : true;
 	if(!isSupported)
 		PVK_WARNING("Requested GPU features are not supported");
 	return isSupported;
@@ -689,17 +698,20 @@ PVK_LINKAGE bool __pvkIsPhysicalDeviceSuitable(VkPhysicalDevice device, VkSurfac
 	// isImageSupported &= (requirements->imageWidth >= capabilities.minImageExtent.width) && (requirements->imageWidth <= capabilities.maxImageExtent.width);
 	// isImageSupported &= (requirements->imageHeight >= capabilities.minImageExtent.height) && (requirements->imageHeight <= capabilities.maxImageExtent.height);
 
-	VkPhysicalDeviceFeatures requiredFeatures = { };
-	{
-		requiredFeatures.geometryShader = (requirements->shaders & PVK_SHADER_TYPE_GEOMETRY) ? VK_TRUE : VK_FALSE;
-		requiredFeatures.tessellationShader = (requirements->shaders & PVK_SHADER_TYPE_TESSELLATION) ? VK_TRUE : VK_FALSE;
-	};
+	VkPhysicalDeviceSamplerYcbcrConversionFeatures conversionFeatures = { };
+	conversionFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SAMPLER_YCBCR_CONVERSION_FEATURES;
+	conversionFeatures.samplerYcbcrConversion = requirements->samplerYcbcrConversion ? VK_TRUE : VK_FALSE;
+	VkPhysicalDeviceFeatures2 requiredFeatures2 = { };
+	requiredFeatures2.pNext = &conversionFeatures;
+	requiredFeatures2.features.geometryShader = (requirements->shaders & PVK_SHADER_TYPE_GEOMETRY) ? VK_TRUE : VK_FALSE;
+	requiredFeatures2.features.tessellationShader = (requirements->shaders & PVK_SHADER_TYPE_TESSELLATION) ? VK_TRUE : VK_FALSE;
+
 
 	return isImageSupported 
 			&& __pvkIsDeviceTypeSupported(device, requirements->type)
 			&& __pvkIsPresentModeSupported(device, surface, requirements->presentMode)
 			&& __pvkIsSurfaceFormatSupported(device, surface, (VkSurfaceFormatKHR) { requirements->format, requirements->colorSpace })
-			&& __pvkIsDeviceFeaturesSupported(device, &requiredFeatures);
+			&& __pvkIsDeviceFeaturesSupported(device, &requiredFeatures2);
 }
 #endif
 
@@ -708,14 +720,16 @@ PVK_LINKAGE VkPhysicalDevice pvkGetPhysicalDevice(VkInstance instance, VkSurface
 											VkFormat format, 
 											VkColorSpaceKHR colorSpace, 
 											VkPresentModeKHR presentMode,
-											uint32_t imageCount);
+											uint32_t imageCount,
+											bool samplerYcbcrConversion);
 #ifdef PVK_IMPLEMENTATION
 PVK_LINKAGE VkPhysicalDevice pvkGetPhysicalDevice(VkInstance instance, VkSurfaceKHR surface, 
 											VkPhysicalDeviceType gpuType, 
 											VkFormat format, 
 											VkColorSpaceKHR colorSpace, 
 											VkPresentModeKHR presentMode,
-											uint32_t imageCount)
+											uint32_t imageCount,
+											bool samplerYcbcrConversion)
 {
 	uint32_t deviceCount = 0;
 	VkResult result = vkEnumeratePhysicalDevices(instance, &deviceCount, NULL);
@@ -738,6 +752,7 @@ PVK_LINKAGE VkPhysicalDevice pvkGetPhysicalDevice(VkInstance instance, VkSurface
 			requirements.presentMode = presentMode;
 			requirements.shaders = (PvkShaderFlags)(PVK_SHADER_TYPE_GEOMETRY | PVK_SHADER_TYPE_TESSELLATION);
 			requirements.imageCount = imageCount;
+			requirements.samplerYcbcrConversion = samplerYcbcrConversion;
 			// .imageWidth = 800,
 			// .imageHeight = 800
 		};
@@ -842,11 +857,11 @@ PVK_LINKAGE void __pvkUnionUInt32(uint32_t count, const uint32_t* values, uint32
 #endif
 
 PVK_LINKAGE VkDevice pvkCreateLogicalDeviceWithExtensions(VkInstance instance, VkPhysicalDevice physicalDevice, 
-													uint32_t queueFamilyCount, uint32_t* queueFamilyIndices,
+													uint32_t queueFamilyCount, uint32_t* queueFamilyIndices, bool samplerYcbcrConversion,
 													uint32_t extensionCount, ...);
 #ifdef PVK_IMPLEMENTATION
 PVK_LINKAGE VkDevice pvkCreateLogicalDeviceWithExtensions(VkInstance instance, VkPhysicalDevice physicalDevice, 
-													uint32_t queueFamilyCount, uint32_t* queueFamilyIndices,
+													uint32_t queueFamilyCount, uint32_t* queueFamilyIndices, bool samplerYcbcrConversion,
 													uint32_t extensionCount, ...)
 {
 	// union operation
@@ -900,10 +915,14 @@ PVK_LINKAGE VkDevice pvkCreateLogicalDeviceWithExtensions(VkInstance instance, V
 
 	// TODO: make features configurable
 	VkPhysicalDeviceFeatures features = { };
+	VkPhysicalDeviceSamplerYcbcrConversionFeatures samplerYcbcrConversionFeatures = { };
+	samplerYcbcrConversionFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SAMPLER_YCBCR_CONVERSION_FEATURES;
+	samplerYcbcrConversionFeatures.samplerYcbcrConversion = VK_TRUE;
 
 	VkDeviceCreateInfo dcInfo = { };
 	{
 		dcInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+		dcInfo.pNext = &samplerYcbcrConversionFeatures;
 		dcInfo.queueCreateInfoCount = uniqueQueueFamilyCount;
 		dcInfo.pQueueCreateInfos = queueCreateInfos;
 		dcInfo.enabledExtensionCount = extensionCount;
@@ -1342,9 +1361,9 @@ PVK_LINKAGE void __pvkCheckForMemoryTypesSupport(VkPhysicalDevice device, uint32
 #endif
 
 /* Vulkan Image & ImageView */
-PVK_LINKAGE VkImage __pvkCreateImage(VkDevice device, VkFormat format, uint32_t width, uint32_t height, VkImageUsageFlags usageFlags, uint32_t queueFamilyIndexCount, uint32_t* queueFamilyIndices);
+PVK_LINKAGE VkImage __pvkCreateImage(VkDevice device, VkFormat format, uint32_t width, uint32_t height, VkImageUsageFlags usageFlags, VkImageCreateFlags flags, uint32_t queueFamilyIndexCount, uint32_t* queueFamilyIndices);
 #ifdef PVK_IMPLEMENTATION
-PVK_LINKAGE VkImage __pvkCreateImage(VkDevice device, VkFormat format, uint32_t width, uint32_t height, VkImageUsageFlags usageFlags, uint32_t queueFamilyIndexCount, uint32_t* queueFamilyIndices)
+PVK_LINKAGE VkImage __pvkCreateImage(VkDevice device, VkFormat format, uint32_t width, uint32_t height, VkImageUsageFlags usageFlags, VkImageCreateFlags flags, uint32_t queueFamilyIndexCount, uint32_t* queueFamilyIndices)
 {
 	// union operation
 	uint32_t uniqueQueueFamilyCount;
@@ -1354,6 +1373,7 @@ PVK_LINKAGE VkImage __pvkCreateImage(VkDevice device, VkFormat format, uint32_t 
 	VkImageCreateInfo cInfo = { };
 	{
 		cInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+		cInfo.flags = flags;
 		cInfo.imageType = VK_IMAGE_TYPE_2D;
 		cInfo.format = format;
 		cInfo.extent = (VkExtent3D) { };
@@ -1383,12 +1403,67 @@ PVK_LINKAGE PvkImage pvkCreateImage(VkPhysicalDevice physicalDevice, VkDevice de
 #ifdef PVK_IMPLEMENTATION
 PVK_LINKAGE PvkImage pvkCreateImage(VkPhysicalDevice physicalDevice, VkDevice device, VkMemoryPropertyFlags mflags, VkFormat format, uint32_t width, uint32_t height, VkImageUsageFlags usageFlags, uint32_t queueFamilyIndexCount, uint32_t* queueFamilyIndices)
 {
-	VkImage image = __pvkCreateImage(device, format, width, height, usageFlags, queueFamilyIndexCount, queueFamilyIndices);
+	VkImage image = __pvkCreateImage(device, format, width, height, usageFlags, 0, queueFamilyIndexCount, queueFamilyIndices);
 	VkMemoryRequirements imageMemoryRequirements;
 	vkGetImageMemoryRequirements(device, image, &imageMemoryRequirements);
 	__pvkCheckForMemoryTypesSupport(physicalDevice, imageMemoryRequirements.memoryTypeBits);
 	VkDeviceMemory memory = pvkAllocateMemory(device, imageMemoryRequirements.size, __pvkGetMemoryTypeIndexFromMemoryProperty(physicalDevice, mflags));
 	PVK_CHECK(vkBindImageMemory(device, image, memory, 0));
+	return (PvkImage) { image, memory };
+}
+#endif
+
+PVK_LINKAGE PvkImage pvkCreateImage2(VkPhysicalDevice physicalDevice, VkDevice device, VkMemoryPropertyFlags mflags, VkFormat format, uint32_t width, uint32_t height, VkImageUsageFlags usageFlags, uint32_t queueFamilyIndexCount, uint32_t* queueFamilyIndices);
+#ifdef PVK_IMPLEMENTATION
+PVK_LINKAGE PvkImage pvkCreateImage2(VkPhysicalDevice physicalDevice, VkDevice device, VkMemoryPropertyFlags mflags, VkFormat format, uint32_t width, uint32_t height, VkImageUsageFlags usageFlags, uint32_t queueFamilyIndexCount, uint32_t* queueFamilyIndices)
+{
+	VkImage image = __pvkCreateImage(device, format, width, height, usageFlags, VK_IMAGE_CREATE_DISJOINT_BIT, queueFamilyIndexCount, queueFamilyIndices);
+	
+	VkImagePlaneMemoryRequirementsInfo imagePlaneRequirementInfo = { };
+	imagePlaneRequirementInfo.sType = VK_STRUCTURE_TYPE_IMAGE_PLANE_MEMORY_REQUIREMENTS_INFO;
+	imagePlaneRequirementInfo.planeAspect = (VkImageAspectFlagBits)(VK_IMAGE_ASPECT_PLANE_0_BIT)
+	;
+	VkImageMemoryRequirementsInfo2 info = { };
+	info.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_REQUIREMENTS_INFO_2;
+	info.pNext = &imagePlaneRequirementInfo;
+	info.image = image;
+	VkMemoryRequirements2 imageMemoryRequirements = { };
+	imageMemoryRequirements.sType = VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2;
+	imageMemoryRequirements.pNext = &imagePlaneRequirementInfo;
+	
+	vkGetImageMemoryRequirements2(device, &info, &imageMemoryRequirements);
+	__pvkCheckForMemoryTypesSupport(physicalDevice, imageMemoryRequirements.memoryRequirements.memoryTypeBits);
+	uint32_t imageBits = imageMemoryRequirements.memoryRequirements.memoryTypeBits;
+	VkDeviceSize imageSize = imageMemoryRequirements.memoryRequirements.size;
+	uint32_t plane0Offset = 0;
+	uint32_t plane1Offset = imageSize;
+
+	imagePlaneRequirementInfo.planeAspect = (VkImageAspectFlagBits)(VK_IMAGE_ASPECT_PLANE_1_BIT);
+	vkGetImageMemoryRequirements2(device, &info, &imageMemoryRequirements);
+	__pvkCheckForMemoryTypesSupport(physicalDevice, imageMemoryRequirements.memoryRequirements.memoryTypeBits);
+	imageBits |= imageMemoryRequirements.memoryRequirements.memoryTypeBits;
+	imageSize += imageMemoryRequirements.memoryRequirements.size;
+
+	VkDeviceMemory memory = pvkAllocateMemory(device, imageSize, __pvkGetMemoryTypeIndexFromMemoryProperty(physicalDevice, mflags));
+	
+	VkBindImagePlaneMemoryInfo bindPlane0Info = { };
+	bindPlane0Info.sType = VK_STRUCTURE_TYPE_BIND_IMAGE_PLANE_MEMORY_INFO;
+	bindPlane0Info.planeAspect = VK_IMAGE_ASPECT_PLANE_0_BIT;
+	VkBindImageMemoryInfo bindInfos[2] = { };
+	bindInfos[0].sType = VK_STRUCTURE_TYPE_BIND_IMAGE_MEMORY_INFO;
+	bindInfos[0].pNext = &bindPlane0Info;
+	bindInfos[0].image = image;
+	bindInfos[0].memory = memory;
+	bindInfos[0].memoryOffset = plane0Offset;
+	VkBindImagePlaneMemoryInfo bindPlane1Info = { };
+	bindPlane1Info.sType = VK_STRUCTURE_TYPE_BIND_IMAGE_PLANE_MEMORY_INFO;
+	bindPlane1Info.planeAspect = VK_IMAGE_ASPECT_PLANE_1_BIT;
+	bindInfos[1].sType = VK_STRUCTURE_TYPE_BIND_IMAGE_MEMORY_INFO;
+	bindInfos[1].pNext = &bindPlane1Info;
+	bindInfos[1].image = image;
+	bindInfos[1].memory = memory;
+	bindInfos[1].memoryOffset = plane1Offset;
+	PVK_CHECK(vkBindImageMemory2(device, 2, bindInfos));
 	return (PvkImage) { image, memory };
 }
 #endif
@@ -1409,6 +1484,34 @@ PVK_LINKAGE VkImageView pvkCreateImageView(VkDevice device, VkImage image, VkFor
 	VkImageViewCreateInfo cInfo = { };
 	{
 		cInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+		cInfo.image = image;
+		cInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+		cInfo.format = format;
+		cInfo.components = (VkComponentMapping) { VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY };
+		cInfo.subresourceRange = (VkImageSubresourceRange) { };
+		{
+			cInfo.subresourceRange.aspectMask = aspectMask;
+			cInfo.subresourceRange.levelCount = 1;
+			cInfo.subresourceRange.layerCount = 1;
+		}
+	};
+	VkImageView imageView;
+	PVK_CHECK(vkCreateImageView(device, &cInfo, NULL, &imageView));
+	return imageView;
+}
+#endif
+
+PVK_LINKAGE VkImageView pvkCreateImageView2(VkDevice device, VkImage image, VkFormat format, VkImageAspectFlagBits aspectMask, VkSamplerYcbcrConversion conversion);
+#ifdef PVK_IMPLEMENTATION
+PVK_LINKAGE VkImageView pvkCreateImageView2(VkDevice device, VkImage image, VkFormat format, VkImageAspectFlagBits aspectMask, VkSamplerYcbcrConversion conversion)
+{
+	VkSamplerYcbcrConversionInfo conversionInfo	= { };
+	conversionInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_YCBCR_CONVERSION_INFO;
+	conversionInfo.conversion = conversion;
+	VkImageViewCreateInfo cInfo = { };
+	{
+		cInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+		cInfo.pNext = &conversionInfo;
 		cInfo.image = image;
 		cInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
 		cInfo.format = format;
