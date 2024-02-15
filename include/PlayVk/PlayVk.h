@@ -702,7 +702,7 @@ PVK_LINKAGE bool __pvkIsPhysicalDeviceSuitable(VkPhysicalDevice device, VkSurfac
 	conversionFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SAMPLER_YCBCR_CONVERSION_FEATURES;
 	conversionFeatures.samplerYcbcrConversion = requirements->samplerYcbcrConversion ? VK_TRUE : VK_FALSE;
 	VkPhysicalDeviceFeatures2 requiredFeatures2 = { };
-	requiredFeatures2.pNext = &conversionFeatures;
+	requiredFeatures2.pNext = requirements->samplerYcbcrConversion ? &conversionFeatures : NULL;
 	requiredFeatures2.features.geometryShader = (requirements->shaders & PVK_SHADER_TYPE_GEOMETRY) ? VK_TRUE : VK_FALSE;
 	requiredFeatures2.features.tessellationShader = (requirements->shaders & PVK_SHADER_TYPE_TESSELLATION) ? VK_TRUE : VK_FALSE;
 
