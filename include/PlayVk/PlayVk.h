@@ -1435,12 +1435,14 @@ PVK_LINKAGE PvkImage pvkCreateImage2(VkPhysicalDevice physicalDevice, VkDevice d
 	uint32_t imageBits = imageMemoryRequirements.memoryRequirements.memoryTypeBits;
 	VkDeviceSize imageSize = imageMemoryRequirements.memoryRequirements.size;
 	uint32_t plane0Offset = 0;
-	uint32_t plane1Offset = imageSize;
 
 	imagePlaneRequirementInfo.planeAspect = (VkImageAspectFlagBits)(VK_IMAGE_ASPECT_PLANE_1_BIT);
 	vkGetImageMemoryRequirements2(device, &info, &imageMemoryRequirements);
 	__pvkCheckForMemoryTypesSupport(physicalDevice, imageMemoryRequirements.memoryRequirements.memoryTypeBits);
 	imageBits |= imageMemoryRequirements.memoryRequirements.memoryTypeBits;
+	imageSize += (imageMemoryRequirements.memoryRequirements.alignment - (imageSize % imageMemoryRequirements.memoryRequirements.alignment))
+					% imageMemoryRequirements.memoryRequirements.alignment;
+	uint32_t plane1Offset = imageSize;
 	imageSize += imageMemoryRequirements.memoryRequirements.size;
 
 	VkDeviceMemory memory = pvkAllocateMemory(device, imageSize, __pvkGetMemoryTypeIndexFromMemoryProperty(physicalDevice, mflags));
