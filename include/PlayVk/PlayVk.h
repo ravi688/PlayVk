@@ -1429,7 +1429,6 @@ PVK_LINKAGE PvkImage pvkCreateImage2(VkPhysicalDevice physicalDevice, VkDevice d
 	info.image = image;
 	VkMemoryRequirements2 imageMemoryRequirements = { };
 	imageMemoryRequirements.sType = VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2;
-	imageMemoryRequirements.pNext = &imagePlaneRequirementInfo;
 	
 	vkGetImageMemoryRequirements2(device, &info, &imageMemoryRequirements);
 	__pvkCheckForMemoryTypesSupport(physicalDevice, imageMemoryRequirements.memoryRequirements.memoryTypeBits);
