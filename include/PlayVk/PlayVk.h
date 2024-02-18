@@ -1179,14 +1179,15 @@ PVK_LINKAGE void pvkSubmit(VkCommandBuffer commandBuffer, VkQueue queue, VkSemap
 #ifdef PVK_IMPLEMENTATION
 PVK_LINKAGE void pvkSubmit(VkCommandBuffer commandBuffer, VkQueue queue, VkSemaphore wait, VkSemaphore signal, VkFence signalFence)
 {
+	PVK_ASSERT(commandBuffer != VK_NULL_HANDLE);
 	VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 	VkSubmitInfo info = { };
 	{
 		info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-		info.waitSemaphoreCount = 1;
+		info.waitSemaphoreCount = (wait == VK_NULL_HANDLE) ? 0 : 1;
 		info.pWaitSemaphores = &wait;
 		info.pWaitDstStageMask = &waitStage;
-		info.signalSemaphoreCount = 1;
+		info.signalSemaphoreCount = (signal == VK_NULL_HANDLE) ? 0 : 1;
 		info.pSignalSemaphores = &signal;
 		info.commandBufferCount = 1;
 		info.pCommandBuffers = &commandBuffer;
@@ -1530,9 +1531,9 @@ PVK_LINKAGE VkImageView pvkCreateImageView2(VkDevice device, VkImage image, VkFo
 }
 #endif
 
-PVK_LINKAGE VkImageView* pvkCreateSwapchainImageViews(VkDevice device, VkSwapchainKHR swapchain, VkFormat format, uint32_t* outImageCount);
+PVK_LINKAGE	VkImage* pvkGetSwapchainImages(VkDevice	device, VkSwapchainKHR swapchain, uint32_t* outImageCount);
 #ifdef PVK_IMPLEMENTATION
-PVK_LINKAGE VkImageView* pvkCreateSwapchainImageViews(VkDevice device, VkSwapchainKHR swapchain, VkFormat format, uint32_t* outImageCount)
+PVK_LINKAGE	VkImage* pvkGetSwapchainImages(VkDevice	device, VkSwapchainKHR swapchain, uint32_t* outImageCount)
 {
 	// get the swapchain images
 	uint32_t imageCount;
@@ -1541,11 +1542,21 @@ PVK_LINKAGE VkImageView* pvkCreateSwapchainImageViews(VkDevice device, VkSwapcha
 		*outImageCount = imageCount;
 	VkImage* images = PVK_NEWV(VkImage, imageCount);
 	PVK_CHECK(vkGetSwapchainImagesKHR(device, swapchain, &imageCount, images));
+	return images;
+}
+#endif
 
+PVK_LINKAGE VkImageView* pvkCreateSwapchainImageViews(VkDevice device, VkSwapchainKHR swapchain, VkFormat format, uint32_t* outImageCount);
+#ifdef PVK_IMPLEMENTATION
+PVK_LINKAGE VkImageView* pvkCreateSwapchainImageViews(VkDevice device, VkSwapchainKHR swapchain, VkFormat format, uint32_t* outImageCount)
+{
+	uint32_t imageCount;
+	VkImage* images = pvkGetSwapchainImages(device, swapchain, &imageCount);
+	if(outImageCount != NULL)
+		*outImageCount = imageCount;
 	VkImageView* imageViews = PVK_NEWV(VkImageView, imageCount);
 	for(int i = 0; i < imageCount; i++)
 		imageViews[i] = pvkCreateImageView(device, images[i], format, VK_IMAGE_ASPECT_COLOR_BIT);
-
 	PVK_DELETE(images);
 	return imageViews;
 }
