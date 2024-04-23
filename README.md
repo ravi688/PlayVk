@@ -34,3 +34,8 @@ VkInstance instance = ...
 PvkWindow* window = ...
 VkSurfaceKHR surface = pvkWindowCreateVulkanSurface(window, instance);
 ```
+
+## About Me
+I'm a software engineer working on GPU development toolchains and GPU application development frameworks. 
+You can always find me on [LinkedIn](https://www.linkedin.com/in/ravi-prakash-singh/), [Github](https://github.com/ravi688), or [Youtube](https://www.youtube.com/@phymacillustrator/videos).
+Or just drop me an email at rp0412204@gmail.com
