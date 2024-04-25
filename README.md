@@ -35,6 +35,37 @@ PvkWindow* window = ...
 VkSurfaceKHR surface = pvkWindowCreateVulkanSurface(window, instance);
 ```
 
+* **pvkGetPhysicalDevice**: Finds a VkPhysicalDevice with the specified requirements
+  * Param 1 (VkInstance): vulkan instance
+  * Param 2 (VkSurfaceKHR): vulkan surface
+  * Param 3 (VkPhysicalDeviceType): type of the physical device
+  * Param 4 (VkFormat): surface format
+  * Param 5 (VkColorSpace): color space
+  * Param 6 (VkPresentModeKHR): present mode
+  * Param 7 (uint32_t): number of swapchain images
+  * Param 8 (bool): whether samplerYcbcrConversion is required? Enables
+```C
+	VkPhysicalDevice physicalGPU = pvkGetPhysicalDevice(instance, surface,
+                                                     VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, 
+                                                     VK_FORMAT_B8G8R8A8_SRGB, 
+                                                     VK_COLOR_SPACE_SRGB_NONLINEAR_KHR, 
+                                                     VK_PRESENT_MODE_FIFO_KHR, 3, false);
+```
+
+* **pvkFindQueueFamilyIndex**: Finds queuy family index with specified VkQueueFlagBits set
+  * Param 1 (VkPhysicalDevice): vulkan physical device
+  * Param 2 (VkQueueFlagBits): vulkan queue flag bits
+```C
+	uint32_t graphicsQueueFamilyIndex = pvkFindQueueFamilyIndex(physicalGPU, VK_QUEUE_GRAPHICS_BIT);
+```
+
+* **pvkFindQueueFamilyIndexWithPresentSupport**: Finds queue family index with present support on the specified surface
+  * Param 1 (VkPhysicalDevice): vulkan physical device
+  * Param 2 (VkSurfaceKHR): vulkan surface
+```
+	uint32_t presentQueueFamilyIndex = pvkFindQueueFamilyIndexWithPresentSupport(physicalGPU, surface);
+```
+
 ## About Me
 I'm a software engineer working on GPU development toolchains and GPU application development frameworks. 
 You can always find me on [LinkedIn](https://www.linkedin.com/in/ravi-prakash-singh/), [Github](https://github.com/ravi688), or [Youtube](https://www.youtube.com/@phymacillustrator/videos).
