@@ -6,6 +6,25 @@ PlayVk is a single header file library for simplifying vulkan objects creation, 
 
 <a href="https://www.buymeacoffee.com/raviprakashsingh" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/default-orange.png" alt="Buy Me A Coffee" height="41" width="174"></a>
 
+## Building shaders
+Install	`glslangValidator` by running the following in mingw64 shell:
+```
+$ pacman -S mingw-w64-x86_64-glslang
+```
+OR <br>
+If you're in Linux (ubuntu), run the following:
+```
+$ sudo apt install glslang-tools
+```
+You can check the install by running:
+```
+$ glslangValidator --version
+```
+Now build the shaders
+```
+$ make -f PlayVk.makefile
+```
+
 ## Building test executable
 > [!NOTE]
 > Only msys2/mingw64 and Linux environments are supported.
