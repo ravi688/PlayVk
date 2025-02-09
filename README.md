@@ -6,6 +6,25 @@ PlayVk is a single header file library for simplifying vulkan objects creation, 
 
 <a href="https://www.buymeacoffee.com/raviprakashsingh" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/default-orange.png" alt="Buy Me A Coffee" height="41" width="174"></a>
 
+## Building test executable
+> [!NOTE]
+> Only msys2/mingw64 and Linux environments are supported.
+1. Install the following meson wrap dependencies
+```
+$ meson wrap install glfw
+$ meson wrap install vulkan-headers
+```
+2. Install Vulkan SDK from [here](https://vulkan.lunarg.com/)
+3. Now build the test executable using meson
+```
+$ meson setup build
+$ meson compile -C build
+```
+4. Execute the executable
+```
+$ ./build/main
+```
+
 ## Documentation
 
 ### Functions
