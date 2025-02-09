@@ -1,0 +1,20 @@
+{
+    "project_name" : "PlayVk",
+    "canonical_name" : "playvk",
+    "description" : "Single header file library for simplifying vulkan",
+    "dependencies" : [ "common", "glfw3", "vulkanheaders" ],
+    "release_defines": [ "-DPVK_RELEASE" ],
+    "debug_defines": [ "-DPVK_DEBUG" ],
+    "install_header_dirs" : [ "include/PlayVk" ],
+    "include_dirs" : [ "include" ],
+    "targets" :
+    [
+        {
+            "name" : "main",
+            "is_executable" : true,
+            "windows_link_args" : [ "-L\"$(VK_SDK_PATH)/Lib/\"", "-lvulkan-1", "-lgdi32" ],
+            "linux_link_args" : [ "-L\"$(VK_SDK_PATH)/Lib/\"", "-lvulkan-1" ],
+            "sources" : [ "source/main.c" ]
+        }
+    ]
+}

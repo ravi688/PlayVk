@@ -9,7 +9,6 @@
 #define PVK_STATIC static
 #define PVK_LINKAGE extern
 #define PVK_INLINE inline
-#define PVK_DEBUG
 // #define PVK_IMPLEMENTATION
 // #define PVK_USE_GLFW
 /* <end> Configuration Switches */
@@ -678,7 +677,7 @@ PVK_LINKAGE bool __pvkIsDeviceFeaturesSupported(VkPhysicalDevice device, VkPhysi
 	isSupported &= requiredFeatures->tessellationShader? (features->tessellationShader && requiredFeatures->tessellationShader) : true;
 	isSupported &= requiredFeatures->samplerAnisotropy? (features->samplerAnisotropy == requiredFeatures->samplerAnisotropy) : true;
 	isSupported &= requiredFeatures->textureCompressionETC2? (features->textureCompressionETC2 == requiredFeatures->textureCompressionETC2) : true;
-	isSupported	&= (requiredFeatures2->pNext != NULL) ? (reinterpret_cast<VkPhysicalDeviceSamplerYcbcrConversionFeatures*>(requiredFeatures2->pNext)->samplerYcbcrConversion == conversionFeatures.samplerYcbcrConversion) : true;
+	isSupported	&= (requiredFeatures2->pNext != NULL) ? (((VkPhysicalDeviceSamplerYcbcrConversionFeatures*)(requiredFeatures2->pNext))->samplerYcbcrConversion == conversionFeatures.samplerYcbcrConversion) : true;
 	if(!isSupported)
 		PVK_WARNING("Requested GPU features are not supported");
 	return isSupported;
