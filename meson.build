@@ -159,6 +159,36 @@ message('pkg config path: ' + pkgconfig_install_path)
 #--------------------------------BUILD TARGETS----------------------------------
 pkgmod = import('pkgconfig')
 
+# -------------- Target: playvk_headers ------------------
+playvk_headers_sources = [
+
+]
+playvk_headers_dependencies = [
+
+]
+playvk_headers_link_args = {
+'windows' : [],
+'linux' : [],
+'darwin' : []
+}
+playvk_headers_build_defines = [
+
+]
+playvk_headers_use_defines = [
+
+]
+playvk_headers_dep = declare_dependency(
+	include_directories: inc,
+	compile_args: playvk_headers_use_defines + build_mode_defines
+)
+pkgmod.generate(	name: 'PlayVk',
+	description: 'Single header file library for simplifying vulkan',
+	filebase: 'playvk_headers',
+	install_dir: pkgconfig_install_path,
+	subdirs: [ 'PlayVk' ],
+	extra_cflags: playvk_headers_use_defines + build_mode_defines
+)
+
 # -------------- Target: main ------------------
 main_sources = [
 'source/main.c'
