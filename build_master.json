@@ -10,6 +10,11 @@
     "targets" :
     [
         {
+            "name" : "playvk_headers",
+            "is_header_only_library" : true,
+            "subdirs" : [ "PlayVk" ]
+        },
+        {
             "name" : "main",
             "is_executable" : true,
             "windows_link_args" : [ "-L\"$(VK_SDK_PATH)/Lib/\"", "-lvulkan-1", "-lgdi32" ],
