@@ -7,6 +7,11 @@
     "debug_defines": [ "-DPVK_DEBUG" ],
     "install_header_dirs" : [ "include/PlayVk" ],
     "include_dirs" : [ "include" ],
+    "vars":
+    {
+        "vulkan_sdk_path" : "run_command(find_program('python'), '-c', 'import os; print(os.environ[\"VK_SDK_PATH\"])', check : false).stdout().strip()",
+        "vulkan_libs_path" : "vulkan_sdk_path + '/Lib/'"
+    },
     "targets" :
     [
         {
@@ -17,8 +22,8 @@
         {
             "name" : "main",
             "is_executable" : true,
-            "windows_link_args" : [ "-L\"$(VK_SDK_PATH)/Lib/\"", "-lvulkan-1", "-lgdi32" ],
-            "linux_link_args" : [ "-L\"$(VK_SDK_PATH)/Lib/\"", "-lvulkan-1" ],
+            "windows_link_args" : [ "link_dir: $vulkan_libs_path", "-lvulkan-1", "-lgdi32" ],
+            "linux_link_args" : [ "link_dir: $vulkan_libs_path", "-lvulkan-1" ],
             "sources" : [ "source/main.c" ]
         }
     ]
