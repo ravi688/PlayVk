@@ -7,6 +7,7 @@
     "debug_defines": [ "-DPVK_DEBUG" ],
     "install_header_dirs" : [ "include/PlayVk" ],
     "include_dirs" : [ "include" ],
+    "pre_config_hook" : "install_meson_wraps.sh",
     "vars":
     {
         "vulkan_sdk_path" : "run_command(find_program('python'), '-c', 'import os; print(os.environ[\"VK_SDK_PATH\"])', check : false).stdout().strip()",
