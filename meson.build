@@ -53,6 +53,7 @@ project('PlayVk', 'c', 'cpp',
 # Variables
 vulkan_sdk_path = run_command(find_program('python'), '-c', 'import os; print(os.environ["VK_SDK_PATH"])', check : false).stdout().strip()
 vulkan_libs_path = vulkan_sdk_path + '/Lib/'
+linux_vulkan_libs_path = vulkan_sdk_path + '/lib/'
 
 
 # Defines
@@ -215,7 +216,7 @@ main_dependencies_bm_internal__ = [
 ]
 main_link_args_bm_internal__ = {
 'windows' : ['-L' +  vulkan_libs_path, '-lvulkan-1', '-lgdi32'],
-'linux' : ['-L' +  vulkan_libs_path, '-lvulkan-1'],
+'linux' : ['-L' +  linux_vulkan_libs_path, '-lvulkan'],
 'darwin' : []
 }
 main_defines_bm_internal__ = [
