@@ -1603,7 +1603,7 @@ PVK_LINKAGE void pvkDestroyFramebuffers(VkDevice device, uint32_t fbCount, VkFra
 {
 	for(int i = 0; i < fbCount; i++)
 		vkDestroyFramebuffer(device, framebuffers[i], NULL);
-	PVK_DELETE(m_vkFramebuffers);
+	PVK_DELETE(framebuffers);
 }
 #endif
 
