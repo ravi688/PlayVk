@@ -30,12 +30,12 @@
 #endif /* C++11 */
 
 /* Logging functions */
-#define PVK_FETAL_ERROR(...) debug_log_fetal_error(__VA_ARGS__)
-#define PVK_WARNING(...) debug_log_warning( __VA_ARGS__)
-#define PVK_ERROR(...) debug_log_error(__VA_ARGS__)
-#define PVK_INFO(...) debug_log_info(__VA_ARGS__)
+#define PVK_FETAL_ERROR(...) com_debug_log_fetal_error(__VA_ARGS__)
+#define PVK_WARNING(...) com_debug_log_warning( __VA_ARGS__)
+#define PVK_ERROR(...) com_debug_log_error(__VA_ARGS__)
+#define PVK_INFO(...) com_debug_log_info(__VA_ARGS__)
 #define PVK_LOG(description, ...) debug_log(description, __LINE__, __FUNCTION__, __FILE__, __VA_ARGS__)
-#define PVK_ASSERT(condition) _assert(condition)
+#define PVK_ASSERT(condition) _com_assert(condition)
 
 /* Memory functions */
 #define PVK_MALLOC(size) malloc(size)
