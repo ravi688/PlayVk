@@ -2,7 +2,10 @@
     "project_name" : "PlayVk",
     "canonical_name" : "playvk",
     "description" : "Single header file library for simplifying vulkan",
-    "dependencies" : [ "common", "glfw3", "vulkanheaders" ],
+    "dependencies" : [ "common", "glfw3" ],
+    // on linux, lunarg package contain environment setup file which installs pkg-config files for vulkan
+    "linux_dependencies" : [ "vulkan" ],
+    "windows_dependencies" : [ "vulkanheaders" ],
     "release_defines": [ "-DPVK_RELEASE" ],
     "debug_defines": [ "-DPVK_DEBUG" ],
     "install_header_dirs" : [ "include/PlayVk" ],
@@ -11,9 +14,9 @@
     "pre_config_root_hook" : "install_dependencies.root.sh",
     "vars":
     {
+        // Variabls for compilation and linking on Windows
         "vulkan_sdk_path" : "run_command(find_program('python'), '-c', 'import os; print(os.environ[\"VK_SDK_PATH\"])', check : false).stdout().strip()",
-        "vulkan_libs_path" : "vulkan_sdk_path + '/Lib/'",
-	"linux_vulkan_libs_path" : "vulkan_sdk_path + '/lib/'"
+        "vulkan_libs_path" : "vulkan_sdk_path + '/Lib/'"
     },
     "targets" :
     [
@@ -26,7 +29,6 @@
             "name" : "main",
             "is_executable" : true,
             "windows_link_args" : [ "link_dir: $vulkan_libs_path", "-lvulkan-1", "-lgdi32" ],
-            "linux_link_args" : [ "link_dir: $linux_vulkan_libs_path", "-lvulkan" ],
             "sources" : [ "source/main.c" ]
         }
     ]
