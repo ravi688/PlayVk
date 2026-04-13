@@ -34,7 +34,8 @@ $ meson wrap install glfw
 $ meson wrap install vulkan-headers
 ```
 2. Install Vulkan SDK from [here](https://vulkan.lunarg.com/)
-3. Now build the test executable using meson
+3. Make sure you execute `source ./setup-env.sh` provided by the vulkan sdk archive. It will expose `VULKAN_SDK` environment variable and pkg-config files as well for `vulkan` package.
+4. Now build the test executable using meson
 ```
 $ meson setup build
 $ meson compile -C build
