@@ -135,7 +135,7 @@ if os_name_bm_internal__ == 'windows'
   link_args_bm_internal__ += windows_link_args_bm_internal__
   sources_bm_internal__ += windows_sources_bm_internal__
   dependencies_bm_internal__ += [ 
-  dependency('vulkanheaders') 
+  dependency('VulkanHeaders') 
   ]
 elif os_name_bm_internal__ == 'linux'
   link_args_bm_internal__ += linux_link_args_bm_internal__
