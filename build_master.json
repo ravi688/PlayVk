@@ -5,7 +5,7 @@
     "dependencies" : [ "common", "glfw3" ],
     // on linux, lunarg package contain environment setup file which installs pkg-config files for vulkan
     "linux_dependencies" : [ "vulkan" ],
-    "windows_dependencies" : [ "vulkanheaders" ],
+    "windows_dependencies" : [ "VulkanHeaders" ],
     "release_defines": [ "-DPVK_RELEASE" ],
     "debug_defines": [ "-DPVK_DEBUG" ],
     "install_header_dirs" : [ "include/PlayVk" ],
